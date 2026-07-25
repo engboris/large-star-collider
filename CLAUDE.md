@@ -180,6 +180,7 @@ exactly one of three kinds:
 | kind | `sgen check` (phase 1) | `sgen run` (phase 2) |
 |---|---|---|
 | `(object x ...)` shared definition | visible | visible |
+| `(spec x ...)` specification | evaluated | skipped |
 | `§X` where X is any expression | evaluated | skipped |
 | unmarked expression | skipped | evaluated |
 
@@ -189,7 +190,11 @@ exactly one of three kinds:
 - `object` is a keyword (not a sigil): a definition shared by both
   phases - the only thing crossing the boundary. `§(object ...)` is an
   error.
-- `def`/`spec` are phase-neutral; the phase comes solely from `§`.
+- `spec` is check-only by nature: a specification is a test suite/type,
+  so a top-level `(spec ...)` lands in the check phase on its own. `§`
+  is therefore redundant on it (`§(spec ...)` still works but the marker
+  does nothing).
+- `def` is phase-neutral; its phase comes solely from `§`.
   Each phase resolves `#name` calls against its own definitions plus the
   shared objects; referencing a name defined in the other phase is an
   error with a phase-aware message.
@@ -203,7 +208,7 @@ exactly one of three kinds:
 
 ### 12. Key Operators
 - **Definition**: `(def name value)` - bind name to value
-- **Spec**: `(spec name value)` - built-in synonym of `def` (marks intent: the thing defined is a test suite/type)
+- **Spec**: `(spec name value)` - like `def` but check-phase only (marks intent: the thing defined is a test suite/type; no `§` needed)
 - **Object**: `(object name value)` - definition shared by both phases (see above)
 - **Static marker**: `§expr` - put a top-level expression in the check phase
 - **Call**: `#name` - retrieve definition
@@ -234,6 +239,7 @@ exactly one of three kinds:
 ### Declarations
 - **Definition**: `(def name value)`
 - **Shared definition**: `(object name value)` - visible in both phases
+- **Specification**: `(spec name value)` - check-phase-only definition (no `§` needed)
 - **Check-phase item**: `§expr` - any top-level expression
 - **Macro**: `(macro (pattern) (expansion))`
 - **Show**: `(show expr)` - display result
@@ -479,7 +485,7 @@ dune build
 dune exec sgen run -- <inputfile>
 
 # Other subcommands
-sgen check <file>        # evaluate the check phase (objects + § items)
+sgen check <file>        # evaluate the check phase (objects + specs + § items)
 sgen preprocess <file>   # show code after macro expansion
 sgen trace <file>        # run with interactive execution trace
 
@@ -516,15 +522,15 @@ run file.sg`, because `dune exec` wraps the process and defeats `timeout`.
 ## Example: Type Definition
 
 ```stellogen
-; spec is a built-in synonym of def (marks intent)
+; spec binds like def but lands in the check phase on its own (no § needed)
 
 ; Macro for type assertion; the § sends call sites to the check phase.
 ; Tested is reactive, Test a catalyst: it is consulted, not consumed
 (macro (:: Tested Test)
   §(== (exec #Tested *#Test) ok))
 
-; Define nat type as interactive tests (check phase)
-§(spec nat {
+; Define nat type as interactive tests (check phase, thanks to spec)
+(spec nat {
   [(-nat 0) ok]
   [(-nat (s N)) (+nat N)]})
 
@@ -708,12 +714,14 @@ a bob 0         ; Constants
 ; Definitions and Calls
 (def name value) ; Define (in the phase of the enclosing item)
 (object name value) ; Define shared between check and run phases
+(spec name value) ; Define in the check phase only (no § needed)
 #name           ; Call/reference
 *#name          ; Call and mark a catalyst
 
 ; Phases
 §expr           ; Any top-level expression: check phase (sgen check)
                 ; Unmarked top-level expressions: run phase (sgen run)
+                ; (spec ...) is check-phase on its own
 
 ; Execution
 (exec c1 c2)    ; c1 and c2's reactive stars react freely; *-marked ones are catalysts

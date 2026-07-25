@@ -291,7 +291,7 @@ or a constellation if it uses the encodings of part III).
 | `(forall g X e)` | iterate over a galaxy | the one binder; the forall of orthogonality |
 | `(use "path")` | import | files are files |
 | `(macro (name X ...) body ...)` | fixed-arity rewrite | the tower's growth mechanism |
-| `(spec name e ...)` | bind, marking intent | alias of `def`; a fixed-arity macro cannot alias a variadic form |
+| `(spec name e ...)` | bind a specification | like `def` but check-phase only; a fixed-arity macro cannot alias a variadic form |
 
 What is deliberately absent: closures, higher-order functions, arithmetic,
 conditionals, general recursion, mutable state, `eval` (term to running
@@ -317,10 +317,13 @@ Identifiers are rays, so definitions can be parametric:
 substitution to the stored expression. Binding a key that unifies with an
 existing key replaces that binding.
 
-`(spec ...)` is accepted wherever `def` is and behaves identically; it
-marks the intent that the defined thing is a test suite. It is a kernel
-form rather than a macro because `def` is variadic (galaxy formation) and
-macros are fixed-arity: no macro can faithfully alias it.
+`(spec ...)` is accepted wherever `def` is and binds identically; it marks
+the intent that the defined thing is a test suite. Because a specification
+only matters to type checking, a top-level `spec` is classified into the
+check phase on its own (as if it carried a `§`), so `sgen run` skips it
+while `sgen check` evaluates it. It is a kernel form rather than a macro
+because `def` is variadic (galaxy formation) and macros are fixed-arity: no
+macro can faithfully alias it.
 
 ### 2.2 `exec`, `then`
 

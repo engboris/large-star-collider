@@ -469,8 +469,10 @@ of that type.
 
 For example, we define a type for natural numbers which is simply a
 constellation corresponding to a "test". We use `spec` instead of `def`: it
-works exactly the same but marks the intent that the definition is a
-specification:
+binds a name just like `def`, but marks the intent that the definition is a
+specification. Because a specification only matters to type checking, a
+top-level `spec` lives in the check phase on its own (see below), so
+`sgen run` skips it:
 
 ```stellogen
 (spec nat {
@@ -513,13 +515,15 @@ top-level expression belongs to exactly one of three kinds:
 | kind | `sgen check` (phase 1) | `sgen run` (phase 2) |
 |---|---|---|
 | `(object x ...)` shared definition | visible | visible |
+| `(spec x ...)` specification | evaluated | skipped |
 | `§X` where X is any expression | evaluated | skipped |
 | unmarked expression | skipped | evaluated |
 
-The rule is uniform: `§` moves a top-level expression to the check phase,
-whatever it is. A `§(def ...)` is a check-phase definition, `§(== ...)` a
-check-phase assertion. `def` and `spec` stay synonyms usable in either
-phase; only `object` is shared.
+`§` moves a top-level expression to the check phase, whatever it is: a
+`§(== ...)` is a check-phase assertion. `spec` needs no `§`: a
+specification is a test suite, so a top-level `(spec ...)` already lives in
+the check phase (`§` on it is redundant). `def` is phase-neutral, its phase
+coming from `§`; `object` is shared between both phases.
 
 ```stellogen
 (object add {
@@ -527,7 +531,7 @@ phase; only `object` is shared.
   [(-add X Y Z) (+add (s X) Y (s Z))]})
 
 ; check phase: types and assertions, skipped by sgen run
-§(spec nat {
+(spec nat {
   [(-nat 0) ok]
   [(-nat (s N)) (+nat N)]})
 §(== (exec *#add [(-add (s 0) (s 0) R) R]) (s (s 0)))
