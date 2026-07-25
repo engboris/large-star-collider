@@ -12,8 +12,8 @@ This guide walks you through the basics.
 
 Follow the install instructions in the README file of the repository.
 
-Open your favorite text editor and create a file `test.sg`. You can run your
-file with `sgen run test.sg`.
+Open your favorite text editor and create a file `test.sg`. You can evaluate
+your file with `sgen eval test.sg`.
 
 Check that everything works fine by writing and running the following program:
 
@@ -548,9 +548,14 @@ The prelude's `::` macro hides a `§` in its expansion, so every type
 assertion written with it automatically lives in the check phase. A check
 goes right after the definition it checks.
 
-`sgen check` must pass before shipping (e.g. as a CI gate): `sgen run`
-skips every check and pays nothing for them, so nothing at runtime
-verifies that checking ever happened.
+`sgen eval` evaluates both phases in order, the check phase first and the
+run phase only if it passed. That is how a Stellogen program is normally
+invoked: a checked program, checks included.
+
+The two phases are also available separately. `sgen run` skips every
+check and pays nothing for them, so nothing at runtime verifies that
+checking ever happened; if you ship that way, `sgen check` must pass
+first (e.g. as a CI gate).
 
 Imports (`use`) are executed by both phases and the imported file's items
 classify themselves; `§(use ...)` imports only in the check phase. Macros

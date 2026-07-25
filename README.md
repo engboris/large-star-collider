@@ -122,7 +122,7 @@ If you wish, you can explicitly specify the derivation, like `nix build .#defaul
 Assuming the executable is named `sgen` and that it is in your PATH:
 
 ```bash
-sgen run examples/hello.sg
+sgen eval examples/hello.sg
 ```
 
 ### 3. Learn the Basics
@@ -134,19 +134,43 @@ sgen run examples/hello.sg
 
 ## Commands
 
-Stellogen provides four main commands:
+Stellogen provides five main commands:
 
-### `run` - Execute a Program
+### `eval` - Evaluate a Program
 
-Run a Stellogen program:
+Evaluate both phases of a program, the check phase first and the run
+phase only if it passed. This is the normal way to invoke a Stellogen
+file:
+
+```bash
+sgen eval <filename>
+```
+
+**Example**:
+```bash
+sgen eval examples/hello.sg
+```
+
+A failing assertion means the run phase is never attempted.
+
+### `run` - Run Phase Only
+
+Execute the run phase, skipping every check:
 
 ```bash
 sgen run <filename>
 ```
 
-**Example**:
+Since nothing at runtime verifies that checking ever happened, a program
+shipped this way needs `sgen check` to have passed first.
+
+### `check` - Check Phase Only
+
+Evaluate the check phase alone: specifications, `§` items and the type
+assertions written with `::`. This is what a CI gate runs.
+
 ```bash
-sgen run examples/hello.sg
+sgen check <filename>
 ```
 
 ### `preprocess` - View Preprocessed Code
@@ -170,7 +194,7 @@ sgen trace <filename>
 Shows each fusion step with visual arrows pointing to the exact rays being connected. Press Enter to advance through each step.
 
 For re-running on file changes during development, use a general-purpose
-watcher such as `entr` or `watchexec`, e.g. `ls myprogram.sg | entr sgen run
+watcher such as `entr` or `watchexec`, e.g. `ls myprogram.sg | entr sgen eval
 myprogram.sg`.
 
 ---

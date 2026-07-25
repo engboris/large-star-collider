@@ -479,19 +479,23 @@ dune build
 ### Running Programs
 ```bash
 # Using built executable
-./_build/default/bin/sgen.exe run <inputfile>
+./_build/default/bin/sgen.exe eval <inputfile>
 
 # Using Dune
-dune exec sgen run -- <inputfile>
+dune exec sgen eval -- <inputfile>
 
-# Other subcommands
-sgen check <file>        # evaluate the check phase (objects + specs + § items)
+# Subcommands
+sgen eval <file>         # both phases: check first, then run if it passed
+sgen run <file>          # run phase only (every check skipped)
+sgen check <file>        # check phase only (objects + specs + § items)
 sgen preprocess <file>   # show code after macro expansion
 sgen trace <file>        # run with interactive execution trace
 
-# Both run and check exit non-zero on failure. check collects assertion
-# failures per top-level item; run stops at the first error. Nothing at
-# runtime verifies that check ever ran: gate it in CI.
+# eval is the normal way to invoke a program; run and check are the two
+# phases in isolation. All three exit non-zero on failure. check collects
+# assertion failures per top-level item; run stops at the first error.
+# Nothing at runtime verifies that check ever ran: gate it in CI, or use
+# eval.
 
 # Help
 sgen --help

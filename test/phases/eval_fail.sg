@@ -1,0 +1,3 @@
+; a failing check phase must stop eval before the run phase
+§(== a b)
+(show ran)

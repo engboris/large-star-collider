@@ -20,6 +20,10 @@ let check_stellogen code_js =
   try to_js_result (Web_interface.check_from_string (Js.to_string code_js))
   with e -> Js.string ("ERROR: Exception: " ^ Printexc.to_string e)
 
+let eval_stellogen code_js =
+  try to_js_result (Web_interface.eval_from_string (Js.to_string code_js))
+  with e -> Js.string ("ERROR: Exception: " ^ Printexc.to_string e)
+
 (* Export to JavaScript *)
 let () =
   Js.export "Stellogen"
@@ -27,4 +31,6 @@ let () =
       method run code = run_stellogen code
 
       method check code = check_stellogen code
+
+      method eval code = eval_stellogen code
     end

@@ -2,10 +2,12 @@
 
 A browser-based playground for experimenting with Stellogen code, compiled to JavaScript using js_of_ocaml.
 
-The **Run** button evaluates the run phase (like `sgen run`); the **Check**
-button evaluates the check phase (like `sgen check`), so `§` items and `::`
-assertions are verified in the browser too. Keyboard shortcuts: Ctrl+Enter
-to run, Ctrl+Shift+Enter to check.
+The **Eval** button evaluates both phases (like `sgen eval`): the check
+phase first, then the run phase only if it passed. **Run** and **Check**
+evaluate a single phase each (like `sgen run` and `sgen check`), so you can
+watch what phase separation actually skips. `§` items and `::` assertions
+are verified in the browser too. Keyboard shortcuts: Ctrl+Enter to eval,
+Ctrl+Shift+Enter to check.
 
 ## Building the Playground
 

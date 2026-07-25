@@ -10,6 +10,24 @@ Basics: each command sees the shared object and its own items:
   $ sgen check phases/basics.sg
   check-sees (+f a)
 
+eval does both, check phase first:
+  $ sgen eval phases/basics.sg
+  check-sees (+f a)
+  run-sees (+f a)
+
+A failing check phase stops eval before the run phase:
+  $ sgen eval phases/eval_fail.sg
+  error: assertion failed
+    --> phases/eval_fail.sg:2:2
+  
+      2 | §(== a b)
+        |  ^
+  
+    Expected: b
+         Got: a
+  
+  [1]
+
 Separate namespaces: one name, a different value per phase:
   $ sgen run phases/name_reuse.sg
   (+q two)
