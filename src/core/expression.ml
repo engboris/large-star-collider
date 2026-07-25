@@ -19,9 +19,10 @@ module Raw = struct
   type t =
     | Symbol of string
     | Var of ident
+    | GuardedVar of ident
     | String of string
-    | Focus of t
-    | Linear of t
+    | Catalyst of t
+    | Seed of t
     | Call of t
     | Static of t
     | List of t list
@@ -53,9 +54,11 @@ let cons_op = primitive "cons"
 
 let call_op = "#"
 
-let focus_op = "@"
+let catalyst_op = "*"
 
-let linear_op = "*"
+let seed_op = "@"
+
+let guard_op = primitive "!"
 
 let string_op = primitive "string"
 
@@ -91,6 +94,17 @@ let rec to_string : expr -> string = function
 let rec expand_macro : Raw.t -> expr loc = function
   | Raw.Symbol s -> { content = Symbol s; loc = None }
   | Raw.Var x -> { content = Var x; loc = None }
+  | Raw.GuardedVar x ->
+    (* !X: a guarded variable occurrence, encoded as (%! X). Macro
+       substitution reaches the variable inside, so a guard written on
+       a macro parameter transfers to the argument. *)
+    { content =
+        List
+          [ { content = Symbol guard_op; loc = None }
+          ; { content = Var x; loc = None }
+          ]
+    ; loc = None
+    }
   | Raw.String s ->
     { content =
         List
@@ -104,14 +118,14 @@ let rec expand_macro : Raw.t -> expr loc = function
     { content = List [ { content = Symbol call_op; loc = None }; e ]
     ; loc = None
     }
-  | Raw.Focus e' ->
+  | Raw.Catalyst e' ->
     let e = expand_macro e' in
-    { content = List [ { content = Symbol focus_op; loc = None }; e ]
+    { content = List [ { content = Symbol catalyst_op; loc = None }; e ]
     ; loc = None
     }
-  | Raw.Linear e' ->
+  | Raw.Seed e' ->
     let e = expand_macro e' in
-    { content = List [ { content = Symbol linear_op; loc = None }; e ]
+    { content = List [ { content = Symbol seed_op; loc = None }; e ]
     ; loc = None
     }
   | Raw.Static e' ->
@@ -468,28 +482,28 @@ let rec raylist_of_expr expr : (ray list, expr_err) Result.t =
   | invalid -> Error (InvalidRaylist (to_string invalid))
 
 let rec star_of_expr : expr -> (Marked.star, expr_err) Result.t = function
-  | List [ { content = Symbol k; _ }; s ] when equal_string k focus_op ->
+  | List [ { content = Symbol k; _ }; s ] when equal_string k catalyst_op ->
     let* ss = star_of_expr s.content in
-    ss |> Marked.refocus |> Result.return
-  | List [ { content = Symbol k; _ }; s ] when equal_string k linear_op ->
+    ss |> Marked.make_catalyst |> Result.return
+  | List [ { content = Symbol k; _ }; s ] when equal_string k seed_op ->
     let* ss = star_of_expr s.content in
-    ss |> Marked.set_linear true |> Result.return
+    ss |> Marked.make_seed |> Result.return
   | List [ { content = Symbol k; _ }; s; { content = List ps; _ } ]
     when equal_string k params_op ->
     let* content = raylist_of_expr s.content in
     let* bans = bans_of_expr ps in
-    Marked.Action ({ content; bans }, false) |> Result.return
+    Marked.Reactive { content; bans } |> Result.return
   | e ->
     let* content = raylist_of_expr e in
-    Marked.Action ({ content; bans = [] }, false) |> Result.return
+    Marked.Reactive { content; bans = [] } |> Result.return
 
 let rec constellation_of_expr :
   expr -> (Marked.constellation, expr_err) Result.t = function
   | Symbol s ->
-    [ Marked.Action ({ content = [ var (s, None) ]; bans = [] }, false) ]
+    [ Marked.Reactive { content = [ var (s, None) ]; bans = [] } ]
     |> Result.return
   | Var x ->
-    [ Marked.Action ({ content = [ var (x, None) ]; bans = [] }, false) ]
+    [ Marked.Reactive { content = [ var (x, None) ]; bans = [] } ]
     |> Result.return
   | List [ { content = Symbol s; _ }; h; t ] when equal_string s cons_op ->
     let* sh = star_of_expr h.content in
@@ -497,7 +511,7 @@ let rec constellation_of_expr :
     Ok (sh :: ct)
   | List g ->
     let* rg = ray_of_expr (List g) in
-    [ Marked.Action ({ content = [ rg ]; bans = [] }, false) ] |> Result.return
+    [ Marked.Reactive { content = [ rg ]; bans = [] } ] |> Result.return
 
 (* ---------------------------------------
    Stellogen expr of Expr
@@ -524,12 +538,12 @@ let rec sgen_expr_of_expr ?(enclosing_loc : source_location option = None)
   | List [ { content = Symbol op; _ }; arg ] when String.equal op call_op ->
     let* ray = ray_of_expr arg.content |> wrap_error in
     Call (ray, loc) |> Result.return
-  | List [ { content = Symbol op; _ }; arg ] when String.equal op focus_op ->
+  | List [ { content = Symbol op; _ }; arg ] when String.equal op catalyst_op ->
     let* sgen_expr = recur arg in
-    Focus sgen_expr |> Result.return
-  | List [ { content = Symbol op; _ }; arg ] when String.equal op linear_op ->
+    Catalyst sgen_expr |> Result.return
+  | List [ { content = Symbol op; _ }; arg ] when String.equal op seed_op ->
     let* sgen_expr = recur arg in
-    Linear sgen_expr |> Result.return
+    Seed sgen_expr |> Result.return
   | List [ { content = Symbol op; _ }; rays_expr; bans_expr ]
     when String.equal op params_op ->
     (* (params rays_list bans_list) → create %params term structure *)
@@ -549,15 +563,11 @@ let rec sgen_expr_of_expr ?(enclosing_loc : source_location option = None)
     Exec (combined, loc) |> Result.return
   | List ({ content = Symbol "then"; _ } :: first :: rest) ->
     (* (then c1 c2 ... cn): staged execution. Left fold where each step
-       executes against the previous result focused as state:
-       (then a b) = (exec b @a). Each stage keeps its own location (the
-       line of that stage's expression), not the location of the whole
-       `then` form, so tracing a pipeline shows progress line by line.
-       Every step but the last is re-focused so it can feed the next
-       stage; the last step is left bare so the overall result behaves
-       like any other exec result (usable later either as state, with an
-       explicit @, or as an action) instead of permanently baking in
-       focus. *)
+       executes against the previous result: (then a b) = (exec b a).
+       An exec result is reactive, so it feeds the next stage without
+       any refocusing. Each stage keeps its own location (the line of
+       that stage's expression), not the location of the whole `then`
+       form, so tracing a pipeline shows progress line by line. *)
     let* first_expr = recur first in
     let* step_exprs =
       List.map rest ~f:(fun step ->
@@ -566,17 +576,9 @@ let rec sgen_expr_of_expr ?(enclosing_loc : source_location option = None)
         Result.return (step_loc, step_expr) )
       |> Result.all
     in
-    begin match List.rev step_exprs with
-    | [] -> Result.return first_expr
-    | (last_loc, last_step) :: rev_init_steps ->
-      let init_steps = List.rev rev_init_steps in
-      let focused_acc =
-        List.fold_left init_steps ~init:first_expr
-          ~f:(fun acc (step_loc, step) ->
-          Focus (Exec (Group [ step; Focus acc ], step_loc)) )
-      in
-      Exec (Group [ last_step; Focus focused_acc ], last_loc) |> Result.return
-    end
+    List.fold_left step_exprs ~init:first_expr ~f:(fun acc (step_loc, step) ->
+      Exec (Group [ step; acc ], step_loc) )
+    |> Result.return
   | List [ { content = Symbol op; _ }; expr1; expr2 ]
     when String.equal op expect_op ->
     let* sgen_expr1 = recur expr1 in
@@ -670,6 +672,11 @@ let classify_item (expr : expr loc) :
   | List ({ content = Symbol h; _ } :: _) when String.equal h object_op ->
     let* sgen = sgen_expr_of_expr expr in
     Ok (Shared, sgen)
+  | List ({ content = Symbol h; _ } :: _) when String.equal h spec_op ->
+    (* spec marks a test suite / type: it belongs to the check phase by
+       nature, so it is CheckOnly without needing a § marker. *)
+    let* sgen = sgen_expr_of_expr expr in
+    Ok (CheckOnly, sgen)
   | List [ { content = Symbol h; _ }; _ ] when String.equal h "use" ->
     (* Imports run in both phases; the imported file's items
        self-classify under the active phase *)

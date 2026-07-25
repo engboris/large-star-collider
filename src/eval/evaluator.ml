@@ -18,9 +18,9 @@ let cons_sym = (Null, "%cons")
 
 let nil_sym = (Null, "%nil")
 
-let focus_sym = (Null, "@")
+let catalyst_sym = (Null, "*")
 
-let linear_sym = (Null, "*")
+let seed_sym = (Null, "@")
 
 let params_sym = (Null, "%params")
 
@@ -45,13 +45,10 @@ let term_of_constellation (c : Marked.constellation) : StellarRays.term =
   let open StellarRays in
   let rec star_to_term (s : Marked.star) : term =
     let content_term = star_content_to_term (Marked.remove s) in
-    let linear_term =
-      if Marked.is_linear s then Func (linear_sym, [ content_term ])
-      else content_term
-    in
     match s with
-    | State _ -> Func (focus_sym, [ linear_term ])
-    | Action _ -> linear_term
+    | Reactive _ -> content_term
+    | Catalyst _ -> Func (catalyst_sym, [ content_term ])
+    | Seed _ -> Func (seed_sym, [ content_term ])
   and star_content_to_term (s : Raw.star) : term =
     let rays_term = rays_to_term s.content in
     if List.is_empty s.bans then rays_term
@@ -88,14 +85,14 @@ let rec constellation_of_term (t : StellarRays.term) : Marked.constellation =
     (* %cons at constellation level: list of stars *)
     constellation_of_term star @ constellation_of_term rest
   | Func ((Null, "%nil"), []) -> []
-  | Func ((Null, "@"), [ inner ]) ->
-    constellation_of_term inner |> Marked.refocus_all
   | Func ((Null, "*"), [ inner ]) ->
-    constellation_of_term inner |> Marked.set_linear_all true
+    constellation_of_term inner |> Marked.make_catalyst_all
+  | Func ((Null, "@"), [ inner ]) ->
+    constellation_of_term inner |> Marked.make_seed_all
   | Func ((Null, "%params"), [ rays_term; bans_term ]) ->
     let rays = rays_of_term rays_term in
     let bans = bans_of_term bans_term in
-    [ Action ({ content = rays; bans }, false) ]
+    [ Reactive { content = rays; bans } ]
   | other ->
     (* Check if this looks like a %cons list of rays (star representation) *)
     if is_cons_list other then
@@ -107,10 +104,10 @@ let rec constellation_of_term (t : StellarRays.term) : Marked.constellation =
         constellation_of_term group
       | _ ->
         (* Multiple rays or non-group rays - create a star *)
-        [ Action ({ content = rays; bans = [] }, false) ]
+        [ Reactive { content = rays; bans = [] } ]
     else
-      (* Single ray treated as a single-ray action star *)
-      [ Action ({ content = [ other ]; bans = [] }, false) ]
+      (* Single ray treated as a single-ray reactive star *)
+      [ Reactive { content = [ other ]; bans = [] } ]
 
 (* Check if a term is a cons list (%cons _ _) or %nil *)
 and is_cons_list = function
@@ -118,9 +115,9 @@ and is_cons_list = function
   | Func ((Null, "%nil"), []) -> true
   | _ -> false
 
-(* Check if a term looks like a star (either @ focused, %params, or cons list) *)
+(* Check if a term looks like a star (either a * catalyst, %params, or cons
+   list) *)
 and is_star_term = function
-  | Func ((Null, "@"), _) -> true
   | Func ((Null, "*"), _) -> true
   | Func ((Null, "%params"), _) -> true
   | Func ((Null, "%cons"), _) -> true
@@ -211,12 +208,12 @@ and map_ray env ~f : sgen_expr -> sgen_expr = function
   | Group es ->
     let map_es = List.map ~f:(map_ray env ~f) es in
     Group map_es
-  | Focus e ->
+  | Catalyst e ->
     let map_e = map_ray env ~f e in
-    Focus map_e
-  | Linear e ->
+    Catalyst map_e
+  | Seed e ->
     let map_e = map_ray env ~f e in
-    Linear map_e
+    Seed map_e
   | Def (id, es) -> Def (f id, List.map ~f:(map_ray env ~f) es)
   | Forall (gid, bind, body, loc) ->
     Forall (f gid, f bind, map_ray env ~f body, loc)
@@ -436,21 +433,22 @@ let rec eval_sgen_expr ?(trace_cfg : Tracer.trace_config option = None)
       Tracer.set_trace_location cfg (Some lsc_loc)
     | _ -> () );
     let result_constellation =
-      Tracer.exec ~trace:trace_cfg eval_constellation |> Marked.make_action_all
+      Tracer.exec ~trace:trace_cfg eval_constellation
+      |> Marked.make_reactive_all
     in
     Ok (env', term_of_constellation result_constellation)
-  | Focus e ->
+  | Catalyst e ->
     let* env', eval_e = eval_sgen_expr ~trace_cfg ~phase env e in
-    let focused_constellation =
-      constellation_of_term eval_e |> Marked.refocus_all
+    let catalyst_constellation =
+      constellation_of_term eval_e |> Marked.make_catalyst_all
     in
-    Ok (env', term_of_constellation focused_constellation)
-  | Linear e ->
+    Ok (env', term_of_constellation catalyst_constellation)
+  | Seed e ->
     let* env', eval_e = eval_sgen_expr ~trace_cfg ~phase env e in
-    let linear_constellation =
-      constellation_of_term eval_e |> Marked.set_linear_all true
+    let seed_constellation =
+      constellation_of_term eval_e |> Marked.make_seed_all
     in
-    Ok (env', term_of_constellation linear_constellation)
+    Ok (env', term_of_constellation seed_constellation)
   | Def (identifier, exprs) -> (
     match exprs with
     | [ single ] ->
@@ -521,10 +519,11 @@ let rec eval_sgen_expr ?(trace_cfg : Tracer.trace_config option = None)
     let* env2, eval2 = eval_sgen_expr ~trace_cfg ~phase env1 expr2 in
     let const1 = constellation_of_term eval1 in
     let const2 = constellation_of_term eval2 in
-    let normalized1 = Marked.normalize_all const1 in
-    let normalized2 = Marked.normalize_all const2 in
-    if Marked.equal_constellation normalized1 normalized2 then
-      Ok (env2, nil_term)
+    (* Compare the raw stars: the reactive/catalyst mark is not part of
+       what == observes *)
+    let normalized1 = Marked.remove_all const1 in
+    let normalized2 = Marked.remove_all const2 in
+    if Raw.equal_constellation normalized1 normalized2 then Ok (env2, nil_term)
     else
       Error
         (ExpectError

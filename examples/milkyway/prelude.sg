@@ -2,8 +2,13 @@
 ; Common macros for type system and testing
 
 ; Macro for type assertion (iterates over galaxy of tests).
+; The tested value is reactive, each test is a catalyst.
 ; The expansion carries the § marker: every call site becomes a
 ; check-phase item, evaluated by 'sgen check' and skipped by 'sgen run'.
 (macro (:: Tested Test)
   §(forall Test T
-    (== @(exec @#Tested #T) ok)))
+    (== (exec #Tested #T) ok)))
+
+(macro (::* Tested Test)
+  §(forall Test T
+    (== (exec #Tested *#T) ok)))

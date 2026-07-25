@@ -2,36 +2,39 @@
 ; Replace each #your_answer with the correct result of execution.
 ;
 ; Recall: when two rays have opposite polarities (+/-) and their
-; terms unify, they fuse. The matched rays disappear, and the
-; substitution applies to the remaining rays.
+; terms unify, they fuse. The matched rays disappear, the two stars
+; merge, and the substitution applies to the remaining rays.
 ;
 ; Example:
-;   (exec { @[(+f X) X] [(-f a)] })
+;   (exec [(+f X) X] [(-f a)])
 ;   (+f X) and (-f a) fuse with {X := a}. Both rays vanish.
 ;   The remaining ray X becomes a. Result: [a]
 
-(def x1 (exec { @[(+f X) X] [(-f a)] }))
+(def x1 (exec [(+f X) X] [(-f a)]))
 (== #x1 #your_answer)
 
-(def x2 (exec { @[(+f X)] [(-f Y) a] }))
+(def x2 (exec [(+f X)] [(-f Y) a]))
 (== #x2 #your_answer)
 
-; What happens when a focused star can interact with multiple action stars?
-(def x3 (exec { @[(+f X) X] [(-f a)] [(-f b)] }))
+; What happens when a ray has two possible partners?
+(def x3 (exec [(+f X) X] [(-f a)] [(-f b)]))
 (== #x3 #your_answer)
 
 ; Polarities: +1 fuses with -1, +2 fuses with -2, etc.
-; Neutral rays (no polarity) never fuse.
-(def x4 (exec { @[+1 -2] [-2 +3] }))
+; Rays of the same polarity never fuse; neutral rays never fuse.
+; Stars that cannot react stay in the result.
+(def x4 (exec [+1 -2] [-2 +3]))
 (== #x4 #your_answer)
 
-(def x5 (exec { @[-1 +2] [-2 +1] }))
+; After the first fusion the merged star holds two dual rays.
+; Dual rays of one star cancel each other (the internal cut).
+(def x5 (exec [-1 +2] [-2 +1]))
 (== #x5 #your_answer)
 
-(def x6 (exec { @[-1 +2] [-2 +1] }))
+(def x6 (exec [-1 +2] [-2 +1]))
 (== #x6 #your_answer)
 
 ; Chained fusion: first (+f (+g a)) fuses with (-f X),
 ; then (+g a) fuses with (-g X).
-(def x7 (exec { @[(-f X) X] [(+f (+g a))] [(-g X) X] }))
+(def x7 (exec [(-f X) X] [(+f (+g a))] [(-g X) X]))
 (== #x7 #your_answer)

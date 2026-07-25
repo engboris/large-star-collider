@@ -8,7 +8,6 @@ exit 0 is the expected outcome for each file.
   $ sgen check ../examples/naive_nat.sg
   $ sgen check ../examples/sumtypes.sg
   $ sgen check ../examples/binary4.sg
-  $ sgen check ../examples/syntax.sg
   $ sgen check ../examples/lambda/linear_lambda.sg
   $ sgen check ../examples/proofnets/mll.sg
   $ sgen check ../examples/states/nfa.sg

@@ -1,5 +1,5 @@
-; A positive ray offers a greeting; a focused negative ray requests it.
+; A positive ray offers a greeting; a negative ray requests it.
 ; `show` displays the result of their fusion.
 
 (def greeter [(+hello X) (hello X)])
-(show (exec #greeter @[(-hello world)]))  ; => (hello world)
+(show (exec #greeter [(-hello world)]))  ; => (hello world)

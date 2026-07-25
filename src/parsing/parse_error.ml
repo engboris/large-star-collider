@@ -12,8 +12,9 @@ let create_error ~position ~message ?hint () = { position; message; hint }
 (* Convert token to string for error messages *)
 let string_of_token = function
   | Parser.VAR s | Parser.SYM s | Parser.STRING s -> s
-  | Parser.AT -> "@"
+  | Parser.GVAR s -> "!" ^ s
   | Parser.STAR -> "*"
+  | Parser.AT -> "@"
   | Parser.BAR -> "|"
   | Parser.LPAR -> "("
   | Parser.RPAR -> ")"

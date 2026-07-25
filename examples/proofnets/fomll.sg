@@ -4,6 +4,7 @@
 ; FOMLL proof-structures are MLL proof-structures
 ; (cf. examples/proofnets/mll.sg) which contain only cut and axiom
 ; constructors.
+(use "../milkyway/prelude.sg")
 ;
 ; An axiom between vertices x and y becomes the binary postive star
 [+x +y]
@@ -33,12 +34,12 @@
 ;    \   \______/____/
 ;     \________/
 ;
-;    corresponding to the constellation
-(def x {
+;    corresponding to the constellation:
+(object x {
   [+1 +2] [+3 +4] [+5 +6]
-      [-1 -4]  [-2 -5]
+    [-1 -4]  [-2 -5]
 })
-;     which evaluates into
+;    which evaluates into
 ;
 ;   [1, 6]  [3, 4]
 ;    \          /
@@ -48,17 +49,18 @@
 ;
 ;   [3, 6]
 ;
-; This corresponds to the following execution in stellogen
-; in which [-3 +3] is a way to initiate a starting point in computation
-(def comp (exec #x @[-3 +3]))
-(def res { [+3 +6] })
-(== #comp #res)
-
+; This corresponds to the following execution in stellogen:
+(== (exec #x) [+3 +6])
 
 ;  ========================================================
-;  SUCCESSFUL TYPING
+;  TYPING
 ;  ========================================================
 ; Typing works exactly the same as in examples/proofnets/mll.sg
-; with the same specifications (providing you have the right adapters)
-; except that the proof of identity (A ⊗ B) -o (A ⊗ B) is
-(def proof? { [+1 +3] [+2 +4]})
+(spec (⊸ (⊗ A B) (⊗ C D))
+  {[(- (var A)) (- (var B)) ok] [(- (var C))] [(- (var D))]}
+  {[(- (var A)) (- (var B))] [(- (var C))] [(- (var D)) ok]}
+  {[(- (var A)) (- (var B)) ok] [(- (var D))] [(- (var C))]}
+  {[(- (var A)) (- (var B))] [(- (var D))] [(- (var C)) ok]})
+
+(object proof? [+1 +3] [+2 +4])
+(:: proof? (⊸ (⊗ 1 2) (⊗ 3 4)))

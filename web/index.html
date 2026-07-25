@@ -303,11 +303,11 @@
                 <div id="line-numbers" aria-hidden="true"><div id="line-numbers-content"></div></div>
                 <div class="editor-wrapper">
                     <div id="highlight-layer" aria-hidden="true"></div>
-                    <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">; A positive ray offers a greeting; a focused negative ray requests it.
+                    <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">; A positive ray offers a greeting; a negative ray requests it.
 ; `show` displays the result of their fusion.
 
 (def greeter [(+hello X) (hello X)])
-(show (exec #greeter @[(-hello world)]))  ; => (hello world)</textarea>
+(show (exec #greeter [(-hello world)]))  ; => (hello world)</textarea>
                 </div>
             </div>
         </div>
@@ -412,7 +412,7 @@
                 }
 
                 // Operators
-                const ops = ['==', '~=', '||', '@', '*', '#', '§'];
+                const ops = ['==', '~=', '||', '*', '!', '#', '§'];
                 for (const op of ops) {
                     if (!matched && code.substr(pos, op.length) === op) {
                         tokens.push({ type: 'operator', text: op });

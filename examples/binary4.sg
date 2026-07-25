@@ -1,49 +1,45 @@
-; user-defined checking macro: the § in the expansion sends every
-; call site to the check phase
-(macro (:: Tested Test)
-  §(forall Test T
-    (== (then #T #Tested) ok)))
+; specification for binary numbers of 4 bits
+(spec u4 [(-b _ 1 _) (-b _ 2 _) (-b _ 3 _) (-b _ 4 _) ok])
 
-§(spec u4
-  {[(-b _ 1 _) (-b _ 2 _) (-b _ 3 _) (-b _ 4 _) ok]})
-
-; shared: the values below call it from both phases
+; macro for readable creation of binary numbers
 (object (make_bin Name X1 X2 X3 X4)
   { [(+b Name 1 X1)] [(+b Name 2 X2)] [(+b Name 3 X3)] [(+b Name 4 X4)] })
 
-(object b1 #(make_bin b1 0 0 0 1)) (:: b1 u4)
-(object b2 #(make_bin b2 0 0 1 1)) (:: b2 u4)
+; the two binary numbers we will use for this example
+(object b1 #(make_bin b1 0 0 0 1)) (:: b1 u4) (show #b1)
+(object b2 #(make_bin b2 0 0 1 1)) (:: b2 u4) (show #b2)
 
-(show #b1)
-(show #b2)
-
-(def (if A = X then R = Z) [(-b A I X) (+b R I Z)])
+; some macros to make the definitions readable
+(def (if A = X then R = Z)           [(-b A I X) (+b R I Z)])
 (def (if A = X and B = Y then R = Z) [(-b A I X) (-b B I Y) (+b R I Z)])
 
-(def (and A B R) {
+; functions over 1 bit
+(def (and1 A B R)
   #(if A = 0 and B = _ then R = 0)
-  #(if A = 1 and B = X then R = X) })
-(def rand (then #b1 #(and b1 b2 r) #b2))
-(show #rand)
-(== #rand #(make_bin r 0 0 0 1))
-
-(def (or A B R) {
+  #(if A = 1 and B = X then R = X))
+(def (or1 A B R)
   #(if A = 0 and B = X then R = X)
-  #(if A = 1 and B = Y then R = 1) })
-(def ror (then #b1 #(or b1 b2 r) #b2))
-(show #ror)
-(== #ror #(make_bin r 0 0 1 1))
-
-(def (not A R) {
+  #(if A = 1 and B = Y then R = 1))
+(def (not1 A R)
   #(if A = 1 then R = 0)
-  #(if A = 0 then R = 1) })
-(def rnot (then #b1 #(not b1 r)))
-(show #rnot)
-(== #rnot #(make_bin r 1 1 1 0))
+  #(if A = 0 then R = 1))
 
-(def rnand (then #b1 #(and b1 b2 r1) #b2 #(not r1 r2)))
-(show #rnand)
+(def (and X Y) (then #X *#(and1 b1 b2 r) #Y))
+(show #(and b1 b2))
+(== #(and b1 b2) #(make_bin r 0 0 0 1))
 
-(def rxor (then #rnand #(and r2 r r3) #ror))
-(show #rxor)
-(== #rxor #(make_bin r3 0 0 1 0))
+(def (or X Y) (then #b1 *#(or1 b1 b2 r) #b2))
+(show #(or b1 b2))
+(== #(or b1 b2) #(make_bin r 0 0 1 1))
+
+(def (not X) (then #b1 *#(not1 b1 r)))
+(show #(not b1))
+(== #(not b1) #(make_bin r 1 1 1 0))
+
+(def (nand X Y) (then #b1 *#(and1 b1 b2 r1) #b2 *#(not1 r1 r2)))
+(show #(nand b1 b2))
+(== #(nand b1 b2) #(make_bin r2 1 1 1 0))
+
+(def (xor X Y) (then #(nand b1 b2) *#(and1 r2 r r3) #(or b1 b2)))
+(show #(xor b1 b2))
+(== #(xor b1 b2) #(make_bin r3 0 0 1 0))

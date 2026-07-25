@@ -1,8 +1,13 @@
 (*
- * lsc_exec.ml - Queue-based execution engine for star fusion
+ * executor.ml - Queue-based execution engine for star fusion
  *
- * This module implements the core execution algorithm using an explicit
- * work queue approach for clarity and efficiency.
+ * One fusion rule: a reactive ray may fuse with any dual, unifiable,
+ * eligible ray - in its own star (internal cut), in another reactive
+ * star, or in a catalyst. Reactive stars are linear: consumed by
+ * reacting, and whatever remains at saturation is the result.
+ * Catalysts are duplicated at each use, inert toward other catalysts,
+ * and dropped from the result. A ray holding a non-ground guard (%!)
+ * is not a candidate until the guarded position becomes ground.
  *)
 
 open Base
@@ -14,29 +19,19 @@ open Constellation.Raw
    Type Definitions
    ============================================================ *)
 
-(** A candidate fusion between a state ray and an action ray *)
+(** The partner side of a fusion event *)
+type partner_kind =
+  | WithCatalyst of int
+  | WithReactive of int
+  | InternalCut
+
+(** A fusion between a reactive ray and a dual eligible ray *)
 type fusion_candidate =
-  { state_idx : int
-  ; state_ray_idx : int
-  ; action_idx : int
-  ; action_ray_idx : int
+  { source_idx : int
+  ; source_ray_idx : int
+  ; partner : partner_kind
+  ; partner_ray_idx : int
   ; theta : substitution
-  ; state_star : star
-  ; action_star : star
-  ; other_action_rays : ray list (* rays before the matching one *)
-  }
-
-(** An action star still available for fusion, tagged with whether it is
-    consumable (linear): removed from the pool after its first use. *)
-type live_action =
-  { raw : star
-  ; linear : bool
-  }
-
-(** Result of searching for fusions *)
-type fusion_result =
-  { new_stars : star list
-  ; remaining_actions : live_action list
   }
 
 (** Configuration for execution *)
@@ -46,8 +41,8 @@ type exec_config = { mutable var_counter : int }
 type exec_event =
   | StepStart of
       { step : int
-      ; actions : constellation
-      ; states : constellation
+      ; catalysts : constellation
+      ; reactives : constellation
       }
   | FusionFound of fusion_candidate
   | StepComplete of
@@ -67,16 +62,7 @@ let fmap_ban ~f = function
   | Ineq (b1, b2) -> Ineq (f b1, f b2)
   | Incomp (b1, b2) -> Incomp (f b1, f b2)
 
-(** Perform fusion of two stars along matched rays *)
-let perform_fusion ~repl1 ~repl2 ~other_state_rays ~other_action_rays
-  ~state_bans ~action_bans ~theta : star =
-  let new_state = List.map other_state_rays ~f:repl1 in
-  let new_action = List.map other_action_rays ~f:repl2 in
-  let nbans1 = List.map state_bans ~f:(fmap_ban ~f:repl1) in
-  let nbans2 = List.map action_bans ~f:(fmap_ban ~f:repl2) in
-  { content = List.map (new_state @ new_action) ~f:(subst theta)
-  ; bans = List.map (nbans1 @ nbans2) ~f:(fmap_ban ~f:(subst theta))
-  }
+let rays_of_ban = function Ineq (b1, b2) | Incomp (b1, b2) -> [ b1; b2 ]
 
 (** Check if bans are coherent (no contradictions) *)
 let coherent_bans bans =
@@ -103,149 +89,241 @@ let coherent_bans bans =
   in
   ineqs_ok && incomps_ok
 
+(** Merge the remaining halves of two stars along a matched ray pair *)
+let perform_fusion ~repl1 ~repl2 ~other_rays1 ~other_rays2 ~bans1 ~bans2 ~theta
+  : star =
+  let rays1 = List.map other_rays1 ~f:repl1 in
+  let rays2 = List.map other_rays2 ~f:repl2 in
+  let nbans1 = List.map bans1 ~f:(fmap_ban ~f:repl1) in
+  let nbans2 = List.map bans2 ~f:(fmap_ban ~f:repl2) in
+  { content =
+      List.map (rays1 @ rays2) ~f:(fun r -> simplify_guards (subst theta r))
+  ; bans = List.map (nbans1 @ nbans2) ~f:(fmap_ban ~f:(subst theta))
+  }
+
+(* A ray can enter a fusion only if it is polarised and every guarded
+   position in it is ground *)
+let candidate_ray r = is_polarised r && ray_eligible r
+
 (* ============================================================
-   Candidate Finding - Queue-Based Approach
+   Internal Cuts
    ============================================================ *)
 
-(** Find all fusion candidates between a state ray and an action star. Returns
-    list of (action_ray_idx, rays_before, theta) *)
-let find_action_matches ~repl1 ~repl2 (state_ray : ray) (action : star) :
+(** Two dual rays of one star cancel. The rays share the star's scope, so no
+    renaming happens. Returns the branches for the first ray that has at least
+    one internal partner (one branch per partner), or None if the star has no
+    internal cut. *)
+let try_internal_cut ~emit_event ~source_idx (s : star) : star list option =
+  let rays = Array.of_list s.content in
+  let n = Array.length rays in
+  let branch i j theta =
+    let rest =
+      Array.filter_mapi rays ~f:(fun k r ->
+        if k = i || k = j then None else Some r )
+      |> Array.to_list
+    in
+    let fused =
+      { content = List.map rest ~f:(fun r -> simplify_guards (subst theta r))
+      ; bans = List.map s.bans ~f:(fmap_ban ~f:(subst theta))
+      }
+    in
+    if coherent_bans fused.bans then begin
+      emit_event
+        (FusionFound
+           { source_idx
+           ; source_ray_idx = i
+           ; partner = InternalCut
+           ; partner_ray_idx = j
+           ; theta
+           } );
+      Some fused
+    end
+    else None
+  in
+  let rec try_ray i =
+    if i >= n then None
+    else if not (candidate_ray rays.(i)) then try_ray (i + 1)
+    else
+      let branches =
+        List.range 0 n
+        |> List.filter_map ~f:(fun j ->
+          if j = i || not (candidate_ray rays.(j)) then None
+          else
+            match raymatcher rays.(i) rays.(j) with
+            | None -> None
+            | Some theta -> branch i j theta )
+      in
+      if List.is_empty branches then try_ray (i + 1) else Some branches
+  in
+  try_ray 0
+
+(* ============================================================
+   External Fusions
+   ============================================================ *)
+
+(** All matches of one renamed source ray against the rays of one partner star
+    (a catalyst or another reactive star). Returns (partner_ray_idx,
+    other_partner_rays, theta) per match. *)
+let find_partner_matches ~repl1 ~repl2 (source_ray : ray) (partner : star) :
   (int * ray list * substitution) list =
   let rec scan idx before = function
     | [] -> []
-    | r :: rest when not (is_polarised r) ->
-      (* Skip unpolarized rays *)
-      scan (idx + 1) (r :: before) rest
+    | r :: rest when not (candidate_ray r) -> scan (idx + 1) (r :: before) rest
     | r :: rest -> (
-      match raymatcher (repl1 state_ray) (repl2 r) with
+      match raymatcher (repl1 source_ray) (repl2 r) with
       | None -> scan (idx + 1) (r :: before) rest
       | Some theta ->
-        (* Found match, continue scanning for more *)
         let remaining = scan (idx + 1) (r :: before) rest in
         (idx, List.rev before @ rest, theta) :: remaining )
   in
-  scan 0 [] action.content
+  scan 0 [] partner.content
 
-(** Find all fusions for a given state ray against all actions. This is the core
-    work queue processor for a single ray. *)
-let find_ray_fusions ~config ~emit_event ~state_idx ~state_ray_idx ~state_ray
-  ~other_state_rays ~state_bans (actions : live_action list) : fusion_result =
-  let rays_of_ban = function Ineq (b1, b2) | Incomp (b1, b2) -> [ b1; b2 ] in
+type external_result =
+  { branches : star list
+  ; consumed_reactives : int list
+      (* queue indices of matched reactive partners *)
+  }
+
+(** Find all fusions for one reactive ray, against the other reactive stars
+    (which a match consumes) and the catalysts (which persist). Each match
+    yields one branch. *)
+let find_ray_fusions ~config ~emit_event ~source_idx ~source_ray_idx ~source_ray
+  ~other_source_rays ~source_bans ~(reactives : star array)
+  ~(catalysts : star list) : external_result =
   let repl1, used1 =
     injective_renaming config.var_counter
-      ( (state_ray :: other_state_rays)
-      @ List.concat_map state_bans ~f:rays_of_ban )
+      ( (source_ray :: other_source_rays)
+      @ List.concat_map source_bans ~f:rays_of_ban )
   in
-  let results = ref [] in
-  let consumed_actions = ref [] in
-
-  List.iteri actions ~f:(fun action_idx { raw = action; linear } ->
+  let branches = ref [] in
+  let consumed = ref [] in
+  let try_partner ~partner_tag partner_idx (partner : star) : bool =
     let repl2, used2 =
       injective_renaming
         (config.var_counter + used1)
-        (action.content @ List.concat_map action.bans ~f:rays_of_ban)
+        (partner.content @ List.concat_map partner.bans ~f:rays_of_ban)
     in
-    let matches = find_action_matches ~repl1 ~repl2 state_ray action in
-
-    List.iter matches ~f:(fun (action_ray_idx, other_action_rays, theta) ->
-      let candidate =
-        { state_idx
-        ; state_ray_idx
-        ; action_idx
-        ; action_ray_idx
-        ; theta
-        ; state_star =
-            { content = state_ray :: other_state_rays; bans = state_bans }
-        ; action_star = action
-        ; other_action_rays
-        }
-      in
-      emit_event (FusionFound candidate);
-
+    let matches = find_partner_matches ~repl1 ~repl2 source_ray partner in
+    let fused_any = ref false in
+    List.iter matches ~f:(fun (partner_ray_idx, other_partner_rays, theta) ->
       let fused =
-        perform_fusion ~repl1 ~repl2 ~other_state_rays ~other_action_rays
-          ~state_bans ~action_bans:action.bans ~theta
+        perform_fusion ~repl1 ~repl2 ~other_rays1:other_source_rays
+          ~other_rays2:other_partner_rays ~bans1:source_bans ~bans2:partner.bans
+          ~theta
       in
-      if coherent_bans fused.bans then (
-        results := fused :: !results;
-        config.var_counter <- config.var_counter + used1 + used2;
-        if linear then consumed_actions := action_idx :: !consumed_actions ) ) );
-
-  let remaining =
-    List.filter_mapi actions ~f:(fun i a ->
-      if List.mem !consumed_actions i ~equal:Int.equal then None else Some a )
+      if coherent_bans fused.bans then begin
+        emit_event
+          (FusionFound
+             { source_idx
+             ; source_ray_idx
+             ; partner = partner_tag partner_idx
+             ; partner_ray_idx
+             ; theta
+             } );
+        branches := fused :: !branches;
+        fused_any := true;
+        config.var_counter <- config.var_counter + used1 + used2
+      end );
+    !fused_any
   in
-  { new_stars = List.rev !results; remaining_actions = remaining }
-
-(** Try to find fusions for any ray in a state star *)
-let try_state_star ~config ~emit_event ~state_idx (state : star)
-  (actions : live_action list) : (star list * live_action list) option =
-  let rec try_ray ray_idx before = function
-    | [] -> None
-    | r :: rest when not (is_polarised r) ->
-      try_ray (ray_idx + 1) (r :: before) rest
-    | state_ray :: rest ->
-      let other_rays = List.rev_append before rest in
-      let result =
-        find_ray_fusions ~config ~emit_event ~state_idx ~state_ray_idx:ray_idx
-          ~state_ray ~other_state_rays:other_rays ~state_bans:state.bans actions
-      in
-      if List.is_empty result.new_stars then
-        try_ray (ray_idx + 1) (state_ray :: before) rest
-      else Some (result.new_stars, result.remaining_actions)
-  in
-  try_ray 0 [] state.content
+  Array.iteri reactives ~f:(fun i partner ->
+    if i <> source_idx then
+      if try_partner ~partner_tag:(fun k -> WithReactive k) i partner then
+        consumed := i :: !consumed );
+  List.iteri catalysts ~f:(fun i partner ->
+    ignore (try_partner ~partner_tag:(fun k -> WithCatalyst k) i partner : bool) );
+  { branches = List.rev !branches; consumed_reactives = !consumed }
 
 (* ============================================================
    Main Execution Loop
    ============================================================ *)
 
-(** Process the work queue: find first state that can interact *)
-let rec process_queue ~config ~emit_event ~queue_idx ~before actions = function
-  | [] -> None
-  | state :: rest -> (
-    match
-      try_state_star ~config ~emit_event ~state_idx:queue_idx state actions
-    with
-    | None ->
-      process_queue ~config ~emit_event ~queue_idx:(queue_idx + 1)
-        ~before:(state :: before) actions rest
-    | Some (new_stars, new_actions) ->
-      let new_states = List.rev_append before rest @ new_stars in
-      Some (new_states, new_actions) )
-
-(** Main execution function *)
 let exec ?(on_event = fun _ -> ()) mcs : constellation =
   let config = { var_counter = 0 } in
 
-  (* Separate into actions (tagged linear or not) and states. A star's
-     linear flag only has meaning for actions - see Marked.star. *)
-  let actions, states =
-    let rec classify acts sts = function
-      | [] -> (List.rev acts, List.rev sts)
-      | Marked.State (s, _) :: rest -> classify acts (s :: sts) rest
-      | Marked.Action (s, linear) :: rest ->
-        classify ({ raw = s; linear } :: acts) sts rest
+  (* @-marked (seed) stars are tried as a starting point before plain
+     reactive stars: every scan below (internal cuts, external fusions)
+     walks the reactive list front-to-back, so moving seeds to the
+     front is enough to bias where execution starts, without touching
+     what fires, what's kept, or what's linear. Seeds fall back to plain
+     list order among themselves and relative to non-seeds. *)
+  let catalysts, seeded, plain =
+    List.fold mcs ~init:([], [], []) ~f:(fun (cs, sds, pls) -> function
+      | Marked.Catalyst s -> (s :: cs, sds, pls)
+      | Marked.Seed s -> (cs, s :: sds, pls)
+      | Marked.Reactive s -> (cs, sds, s :: pls) )
+  in
+  let catalysts = List.rev catalysts in
+  let reactives = List.rev seeded @ List.rev plain in
+
+  (* Internal cuts: first star holding one is replaced by its branches *)
+  let try_internal reactives =
+    let rec scan idx before = function
+      | [] -> None
+      | s :: rest -> (
+        match try_internal_cut ~emit_event:on_event ~source_idx:idx s with
+        | Some branches -> Some (List.rev_append before (branches @ rest))
+        | None -> scan (idx + 1) (s :: before) rest )
     in
-    classify [] [] mcs
+    scan 0 [] reactives
   in
 
-  let rec loop step actions states =
-    on_event
-      (StepStart
-         { step; actions = List.map actions ~f:(fun a -> a.raw); states } );
+  (* Fusions across stars: first reactive ray with matches takes all of
+     them as branches; the source star and every matched reactive
+     partner are consumed, catalysts persist *)
+  let try_external reactives =
+    let arr = Array.of_list reactives in
+    let n = Array.length arr in
+    let rec per_star source_idx =
+      if source_idx >= n then None
+      else
+        let s = arr.(source_idx) in
+        let rec per_ray ray_idx before = function
+          | [] -> None
+          | r :: rest when not (candidate_ray r) ->
+            per_ray (ray_idx + 1) (r :: before) rest
+          | r :: rest ->
+            let other = List.rev_append before rest in
+            let { branches; consumed_reactives } =
+              find_ray_fusions ~config ~emit_event:on_event ~source_idx
+                ~source_ray_idx:ray_idx ~source_ray:r ~other_source_rays:other
+                ~source_bans:s.bans ~reactives:arr ~catalysts
+            in
+            if List.is_empty branches then
+              per_ray (ray_idx + 1) (r :: before) rest
+            else
+              let kept =
+                Array.filter_mapi arr ~f:(fun i s' ->
+                  if
+                    i = source_idx
+                    || List.mem consumed_reactives i ~equal:Int.equal
+                  then None
+                  else Some s' )
+                |> Array.to_list
+              in
+              Some (kept @ branches)
+        in
+        match per_ray 0 [] s.content with
+        | Some result -> Some result
+        | None -> per_star (source_idx + 1)
+    in
+    per_star 0
+  in
 
-    match
-      process_queue ~config ~emit_event:on_event ~queue_idx:0 ~before:[] actions
-        states
-    with
+  let rec loop step reactives =
+    on_event (StepStart { step; catalysts; reactives });
+    let next =
+      match try_internal reactives with
+      | Some result -> Some result
+      | None -> try_external reactives
+    in
+    match next with
     | None ->
-      on_event (ExecutionDone states);
-      states
-    | Some (new_states, new_actions) ->
-      on_event (StepComplete { step; result = new_states });
-      loop (step + 1) new_actions new_states
+      on_event (ExecutionDone reactives);
+      reactives
+    | Some result ->
+      on_event (StepComplete { step; result });
+      loop (step + 1) result
   in
 
-  loop 1 actions states
-  |> List.filter ~f:(fun s -> not @@ List.is_empty s.content)
+  loop 1 reactives |> List.filter ~f:(fun s -> not @@ List.is_empty s.content)

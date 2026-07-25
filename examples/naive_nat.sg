@@ -1,21 +1,25 @@
 (use "milkyway/prelude.sg")
 
-; the type lives in the check phase
-§(spec nat
+; specification for natural numbers
+; either it is 0 or the successor of a natural number
+(spec nat
   {[(-nat 0) ok]
    [(-nat (s N)) (+nat N)]})
 
-; objects are shared: checked below, used by the program at the bottom
-(object 0 (+nat 0))     (:: 0 nat)
-(object 1 (+nat (s 0))) (:: 1 nat)
-(object 2 (+nat (s (s 0)))) (:: 2 nat)
+(object 0 (+nat 0))             (::* 0 nat)
+(object 1 (+nat (s 0)))         (::* 1 nat)
+(object 2 (+nat (s (s 0))))     (::* 2 nat)
+(object 3 (+nat (s (s (s 0))))) (::* 2 nat)
 
-(def add1 [(-nat X) (+nat (s X))])
+; successor function adding 1
+(def suc [(-nat X) (+nat (s X))])
 
-(def is_empty {
+; function checking if the number is 0
+(def is_null
   [(-nat 0) (res 1)]
-  [(-nat (s _)) (res 0)]})
+  [(-nat (s _)) (res 0)])
 
-(show (exec @#add1 #2))
-(show (exec #is_empty @#0))
-(show (exec #is_empty @#1))
+(show (exec #suc #2))
+(show (exec #suc (exec #suc #2)))
+(show (exec *#is_null #0))
+(show (exec *#is_null #1))

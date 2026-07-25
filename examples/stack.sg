@@ -3,6 +3,8 @@
 ; stack contents. Each star below is a transition rule taking one
 ; configuration to the next one. The `then` pipeline runs the machine:
 ; every stage consumes the previous configuration and produces the next.
+; A stage with alternative rules is a catalyst (*), so the rule that
+; does not match is dropped instead of lingering in the result.
 
 (def (init C) (+state 0 []))
 
@@ -17,8 +19,8 @@
   [(-state 2 [C|X]) (+state 3 X) (+save C)]
 
   ; state 3 to 4: duplicate whatever is now on top of the stack
-  [(-state 3 [0|X]) (+state 4 [0 0|X])]
-  [(-state 3 [1|X]) (+state 4 [1 1|X])]
+  *{ [(-state 3 [0|X]) (+state 4 [0 0|X])]
+     [(-state 3 [1|X]) (+state 4 [1 1|X])] }
 
   ; keep the remembered value around so it survives to the result
   [(-save C) (save C)]

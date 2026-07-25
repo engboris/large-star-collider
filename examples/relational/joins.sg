@@ -1,6 +1,7 @@
 ; RELATIONAL PROGRAMMING: JOINS
 ;
-; Facts are positive rays. A query is a focused star with several
+; Facts are positive rays, packaged as a catalyst (*): reusable and
+; dropped from the result. A query is a reactive star with several
 ; negative rays that must all fuse at once - a join. Execution is
 ; saturation, not Prolog's ordered backtracking search: every matching
 ; combination comes out together, not one at a time.
@@ -14,10 +15,10 @@
 (def two_hop {
   [(+two_hop X Z) (-link X Y) (-link Y Z)]})
 
-(def knowledge { #link #two_hop })
+(def rules #link #two_hop)
 
 ; direct links from b
-(show (exec #link @[(-link b Y) Y]))
+(show (exec *#link [(-link b Y) Y]))
 
 ; who is two hops away from a?
-(show (exec #knowledge @[(-two_hop a Z) Z]))
+(show (exec *#rules [(-two_hop a Z) Z]))

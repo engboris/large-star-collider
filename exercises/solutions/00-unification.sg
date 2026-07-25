@@ -2,33 +2,37 @@
 ; Fill the holes with the correct result of execution.
 
 ; Example:
-; The result of fusing @[(+f X) X] with [(-f a)] is [a]
+; The result of fusing [(+f X) X] with [(-f a)] is [a]
 ; because (+f X) and (-f a) have opposite polarities and unify with {X := a},
 ; the fused rays disappear, and the substitution applies to the remaining ray X
 ; which becomes a.
 
-(def x1 (exec { @[(+f X) X] [(-f a)] }))
+(def x1 (exec [(+f X) X] [(-f a)]))
 (== #x1 [a])
 
-(def x2 (exec { @[(+f X)] [(-f Y) a] }))
+(def x2 (exec [(+f X)] [(-f Y) a]))
 (== #x2 [a])
 
-; What happens when a focused star can interact with multiple action stars?
-(def x3 (exec { @[(+f X) X] [(-f a)] [(-f b)] }))
+; A ray with two possible partners branches: one result per partner.
+(def x3 (exec [(+f X) X] [(-f a)] [(-f b)]))
 (== #x3 { [a] [b] })
 
 ; Polarities: +1 fuses with -1, +2 fuses with -2, etc.
-; Neutral rays (no polarity) never fuse.
-(def x4 (exec { @[+1 -2] [-2 +3] }))
-(== #x4 [+1 -2])
+; Rays of the same polarity never fuse; neutral rays never fuse.
+; Stars that cannot react stay in the result.
+(def x4 (exec [+1 -2] [-2 +3]))
+(== #x4 { [+1 -2] [-2 +3] })
 
-(def x5 (exec { @[-1 +2] [-2 +1] }))
-(== #x5 [-2 +1])
+; -1 fuses with +1, merging the stars into [+2 -2]; the two dual
+; rays then cancel inside the star (the internal cut), leaving
+; nothing at all.
+(def x5 (exec [-1 +2] [-2 +1]))
+(== #x5 {})
 
-(def x6 (exec { @[-1 +2] [-2 +1] }))
-(== #x6 [-2 +1])
+(def x6 (exec [-1 +2] [-2 +1]))
+(== #x6 {})
 
 ; Chained fusion: first (+f (+g a)) fuses with (-f X),
 ; then (+g a) fuses with (-g X).
-(def x7 (exec { @[(-f X) X] [(+f (+g a))] [(-g X) X] }))
+(def x7 (exec [(-f X) X] [(+f (+g a))] [(-g X) X]))
 (== #x7 [a])

@@ -17,17 +17,16 @@ Hello world example:
 
 Lambda calculus example:
   $ sgen run ../examples/lambda/lambda.sg
-  [(out [r X8]) (ida (exp [l X8] d))]
-  [(out X8) (x (exp X8 d))]
+  [(out [r X3]) (lproj (exp [r l X3] d))]
 
 Linear lambda example:
   $ sgen run ../examples/lambda/linear_lambda.sg
-  [(out [r X7]) (ida [l X7])]
   [(out [X7]) (x X7)]
+  [(out [r X7]) (ida [l X7])]
 
 MALL (multiplicative-additive linear logic) example:
   $ sgen run ../examples/proofnets/mall.sg
-  { [(-3 [r l X6]) (-3 [r r X6]) || (slice c b)] [(c X11) (d X11) || (slice c a)] }
+  { [(+3 [l r X]) (d X)] [(+5 [r l X]) (+5 [r r X]) || (slice c b)] [(+5 [l r X3]) (c X3) || (slice c a)] }
 
 MLL (multiplicative linear logic) example:
   $ sgen run ../examples/proofnets/mll.sg
@@ -35,6 +34,7 @@ MLL (multiplicative linear logic) example:
 Natural numbers example:
   $ sgen run ../examples/naive_nat.sg
   (+nat (s (s (s 0))))
+  (+nat (s (s (s (s 0)))))
   (res 1)
   (res 0)
 
@@ -47,13 +47,13 @@ NPDA (non-deterministic pushdown automaton) example:
 
 Relational arithmetic example:
   $ sgen run ../examples/relational/arithmetic.sg
-  (result of 0 + 0 = 0)
-  (result of 0 + (s (s (s (s 0)))) = (s (s (s (s 0)))))
-  (result of (s (s 0)) + (s (s 0)) = (s (s (s (s 0)))))
-  (result of (s (s 0)) + (s (s 0)) = (s (s (s (s 0)))))
-  (result of 0 - 0 = 0)
-  (result of (s (s (s (s 0)))) - (s (s 0)) = (s (s 0)))
-  (result of (s (s (s (s 0)))) - (s (s 0)) = (s (s 0)))
+  (result 0 + 0 = 0)
+  (result 0 + (s (s (s (s 0)))) = (s (s (s (s 0)))))
+  (result (s (s 0)) + (s (s 0)) = (s (s (s (s 0)))))
+  (result (s (s 0)) + (s (s 0)) = (s (s (s (s 0)))))
+  (result 0 - 0 = 0)
+  (result (s (s (s (s 0)))) - (s (s 0)) = (s (s 0)))
+  (result (s (s (s (s 0)))) - (s (s 0)) = (s (s 0)))
 
 Relational joins example:
   $ sgen run ../examples/relational/joins.sg
@@ -73,20 +73,6 @@ Sum types example:
   $ sgen run ../examples/sumtypes.sg
   a
 
-Syntax reference:
-  $ sgen run ../examples/syntax.sg
-  a
-  { [a] [b] [c] }
-  hello world
-  (function a b)
-  { [(+f a)] [(+f b)] [(-f X) (-f Y) (r X Y) || (!= X Y)] }
-  { [(r a b) || (!= a b)] [(r b a) || (!= b a)] }
-  (+n2 (s (s 0)))
-  { [(+field test1) [(+f a) ok]] [(+field test2) [(+f b) ok]] }
-  [(+f a) ok]
-  [(+f b) ok]
-  [(+f c) ok]
-
 Turing machine example:
   $ sgen run ../examples/states/turing.sg
   reject
@@ -104,3 +90,6 @@ NFA (non-deterministic finite automaton) example:
   accept
   {}
   {}
+
+Boolean circuits example (reactive net with ground guards):
+  $ sgen run ../examples/circuits.sg

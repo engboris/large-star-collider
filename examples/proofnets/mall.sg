@@ -1,3 +1,5 @@
+; This example is experimental
+
 (def left  [(+5 [l l|X]) (+5 [l r|X]) || (slice c a)])
 (def right [(+5 [r l|X]) (+5 [r r|X]) || (slice c b)])
 

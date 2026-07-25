@@ -1,7 +1,7 @@
 Test syntax - basic syntax tests
 ==================================
 
-Linear execution test:
+Reactive rule consumption test:
   $ sgen run syntax/linear.sg
 
 Relational recursion test:
@@ -23,4 +23,4 @@ Match (~=) is polarity-blind structural unifiability:
 
 Variable renaming (same-named locals in fused stars stay distinct):
   $ sgen run syntax/var_renaming.sg
-  [(o1 5) (o2 7)]
+  [(o2 7) (o1 5)]

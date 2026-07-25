@@ -113,8 +113,51 @@ let injective_renaming (base : int) (rays : ray list) : (ray -> ray) * int =
   in
   (map Fn.id rename, List.length distinct)
 
+(* ---------------------------------------
+   Ground guards
+   --------------------------------------- *)
+
+(* A `!X` in the source becomes a %! wrapper around the variable. The
+   wrapper marks a position that must be ground before the enclosing
+   ray may interact. Substitution goes through the wrapper, so the
+   requirement transfers to whatever fills the position: !X under
+   X := (s Y) becomes (s !Y). *)
+let guard_name = "%!"
+
+let is_guard_sym (p, f) = equal_polarity p Null && String.equal f guard_name
+
+let is_ground (r : ray) : bool = List.is_empty (vars r)
+
+(* Erase guard wrappers: guards restrict when a ray may interact,
+   never what it unifies with. *)
+let rec strip_guards : ray -> ray = function
+  | Var x -> Var x
+  | Func (f, [ t ]) when is_guard_sym f -> strip_guards t
+  | Func (f, ts) -> Func (f, List.map ~f:strip_guards ts)
+
+(* A ray may interact only when every guarded position in it is
+   ground. *)
+let ray_eligible (r : ray) : bool =
+  let rec check under_guard = function
+    | Var _ -> not under_guard
+    | Func (f, [ t ]) when is_guard_sym f -> check true t
+    | Func (_, ts) -> List.for_all ts ~f:(check under_guard)
+  in
+  check false r
+
+(* Drop guards whose position has become ground, so discharged guards
+   do not linger in residues. *)
+let rec simplify_guards : ray -> ray = function
+  | Var x -> Var x
+  | Func (f, [ t ]) when is_guard_sym f ->
+    let t' = simplify_guards t in
+    if is_ground t' then t' else Func (f, [ t' ])
+  | Func (f, ts) -> Func (f, List.map ~f:simplify_guards ts)
+
 let raymatcher r r' : substitution option =
-  if is_polarised r && is_polarised r' then solution [ (r, r') ] else None
+  if is_polarised r && is_polarised r' then
+    solution [ (strip_guards r, strip_guards r') ]
+  else None
 
 (* Base observation for ~= : structural unifiability, ignoring polarity.
    Polarities are normalized to Null so that the regular unification
@@ -123,7 +166,8 @@ let strip_polarities : ray -> ray =
   map (fun (_, f) -> (Null, f)) (fun v -> Var v)
 
 let terms_unifiable r r' =
-  solution [ (strip_polarities r, strip_polarities r') ] |> Option.is_some
+  let clean r = strip_polarities (strip_guards r) in
+  solution [ (clean r, clean r') ] |> Option.is_some
 
 let fresh_var vars =
   let rec find_fresh_index i =
@@ -138,51 +182,46 @@ let fresh_var vars =
    --------------------------------------- *)
 
 module Marked = struct
-  (* The bool on each variant tracks whether the star is consumable
-     (linear): used at most once per execution. It is orthogonal to the
-     State/Action tag, so the two can vary independently. *)
+  (* Reactive stars are the solution: linear (each exists once,
+     consumed by reacting), mutually interacting, part of the result.
+     Catalysts (marked with a star prefix in the source) are solicited
+     by reactive rays, duplicated at each use, inert toward other
+     catalysts, and dropped from the result. A seed (marked with `@`) is
+     a reactive star with the same linear behavior as any other, except
+     the executor tries it as a starting point before unmarked reactive
+     stars; it is otherwise an ordinary reactive star (kept when
+     unreached, consumed when it reacts). *)
   type star =
-    | State of Raw.star * bool
-    | Action of Raw.star * bool
+    | Reactive of Raw.star
+    | Catalyst of Raw.star
+    | Seed of Raw.star
   [@@deriving eq]
 
   type constellation = star list [@@deriving eq]
 
   let map ~f : star -> star = function
-    | State (s, l) ->
-      State ({ content = List.map ~f s.content; bans = s.bans }, l)
-    | Action (s, l) ->
-      Action ({ content = List.map ~f s.content; bans = s.bans }, l)
+    | Reactive s -> Reactive { content = List.map ~f s.content; bans = s.bans }
+    | Catalyst s -> Catalyst { content = List.map ~f s.content; bans = s.bans }
+    | Seed s -> Seed { content = List.map ~f s.content; bans = s.bans }
 
-  let make_action s = Action (s, false)
+  let make_reactive s = Reactive s
 
-  let make_state s = State (s, false)
+  let make_reactive_all = List.map ~f:make_reactive
 
-  let make_action_all = List.map ~f:make_action
+  let make_catalyst : star -> star = function
+    | Reactive s | Catalyst s | Seed s -> Catalyst s
 
-  let make_state_all = List.map ~f:make_state
+  let make_catalyst_all = List.map ~f:make_catalyst
 
-  let remove : star -> Raw.star = function State (s, _) | Action (s, _) -> s
+  let make_seed : star -> star = function
+    | Reactive s | Catalyst s | Seed s -> Seed s
+
+  let make_seed_all = List.map ~f:make_seed
+
+  let remove : star -> Raw.star = function
+    | Reactive s | Catalyst s | Seed s -> s
 
   let remove_all = List.map ~f:remove
-
-  let is_linear : star -> bool = function State (_, l) | Action (_, l) -> l
-
-  let set_linear (l : bool) : star -> star = function
-    | State (s, _) -> State (s, l)
-    | Action (s, _) -> Action (s, l)
-
-  let set_linear_all (l : bool) = List.map ~f:(set_linear l)
-
-  (* Force State, preserving whatever linear flag the star already had -
-     this is what @ does: it overrides State/Action, not linearity. *)
-  let refocus : star -> star = function
-    | State (s, l) -> State (s, l)
-    | Action (s, l) -> State (s, l)
-
-  let refocus_all = List.map ~f:refocus
-
-  let normalize_all x = x |> remove_all |> make_action_all
 end
 
 let subst_all_vars sub = List.map ~f:(Marked.map ~f:(subst sub))
@@ -190,7 +229,7 @@ let subst_all_vars sub = List.map ~f:(Marked.map ~f:(subst sub))
 let all_vars mcs : StellarSig.idvar list =
   mcs
   |> List.concat_map ~f:(function
-    | Marked.State (s, _) | Marked.Action (s, _) ->
+    | Marked.Reactive s | Marked.Catalyst s | Marked.Seed s ->
     List.concat_map s.content ~f:StellarRays.vars )
 
 let normalize_vars (mcs : Marked.constellation) =

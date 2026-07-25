@@ -5,7 +5,7 @@
     [(+field test22) {
       [(+field test3) 3]}]}]})
 
-(def (get G X) (exec #G @[(-field X)]))
+(def (get G X) (exec *#G [(-field X)]))
 
 (def test1 #(get g test1))
 (== #test1 1)

@@ -64,6 +64,12 @@ and read lexbuf =
   let get_pos () = fst (Sedlexing.lexing_positions lexbuf) in
   let tok =
     match%sedlex lexbuf with
+    (* Ground guard on a variable occurrence: !X. Listed before the
+       generic symbol rule so it wins the tie; '!' followed by
+       anything else (e.g. the != ban) still lexes as a symbol. *)
+    | '!', ('A' .. 'Z' | '_'), Star (Compl (Chars "; \t\n\r()[]{}|")) ->
+      let lexeme = Utf8.lexeme lexbuf in
+      GVAR (String.sub lexeme 1 (String.length lexeme - 1))
     | ( Compl (Chars "';\" \t\n\r()[]{}|@#*" | 0xA7)
       , Star (Compl (Chars "; \t\n\r()[]{}|")) ) -> (
       let lexeme = Utf8.lexeme lexbuf in
@@ -86,8 +92,8 @@ and read lexbuf =
     | '}' ->
       pop_delimiter '{' (get_pos ());
       RBRACE
-    | '@' -> AT
     | '*' -> STAR
+    | '@' -> AT
     | '#' -> SHARP
     | 0xA7 -> SECTION (* the section sign, written as U+00A7 *)
     | '|' -> BAR

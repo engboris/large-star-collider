@@ -2,18 +2,21 @@
 ; Implement boolean operations as constellations and verify them.
 ; Each operation takes boolean inputs (0 or 1) and produces a result.
 ; Replace each #your_answer with the correct definition.
+;
+; Truth tables are catalysts (*): reusable and dropped from the
+; result; queries are plain reactive stars.
 
 ; NOT
 
 ; Define NOT: not(0)=1, not(1)=0
 (def not #your_answer)
 
-(== (exec { #not @[(-not 0 R) R] }) [1])
-(== (exec { #not @[(-not 1 R) R] }) [0])
+(== (exec *#not [(-not 0 R) R]) [1])
+(== (exec *#not [(-not 1 R) R]) [0])
 
 ; How to print the truth table of NOT?
-; Hint: use #not with a focused query that extracts X and Y.
-(def table_not (exec { #not @#your_answer }))
+; Hint: query #not with a star that extracts X and Y.
+(def table_not (exec *#not #your_answer))
 (== #table_not { [(table_not 0 1)] [(table_not 1 0)] })
 
 ; AND
@@ -21,57 +24,57 @@
 ; Define AND with all four cases
 (def and #your_answer)
 
-(== (exec { #and @[(-and 0 0 R) R] }) [0])
-(== (exec { #and @[(-and 0 1 R) R] }) [0])
-(== (exec { #and @[(-and 1 0 R) R] }) [0])
-(== (exec { #and @[(-and 1 1 R) R] }) [1])
+(== (exec *#and [(-and 0 0 R) R]) [0])
+(== (exec *#and [(-and 0 1 R) R]) [0])
+(== (exec *#and [(-and 1 0 R) R]) [0])
+(== (exec *#and [(-and 1 1 R) R]) [1])
 
 ; Find a more compact definition using variables
 (def and2 #your_answer)
 
-(== (exec { #and2 @[(-and 0 0 R) R] }) [0])
-(== (exec { #and2 @[(-and 0 1 R) R] }) [0])
-(== (exec { #and2 @[(-and 1 0 R) R] }) [0])
-(== (exec { #and2 @[(-and 1 1 R) R] }) [1])
+(== (exec *#and2 [(-and 0 0 R) R]) [0])
+(== (exec *#and2 [(-and 0 1 R) R]) [0])
+(== (exec *#and2 [(-and 1 0 R) R]) [0])
+(== (exec *#and2 [(-and 1 1 R) R]) [1])
 
 ; OR
 
 ; Define OR with all four cases
 (def or #your_answer)
 
-(== (exec { #or @[(-or 0 0 R) R] }) [0])
-(== (exec { #or @[(-or 0 1 R) R] }) [1])
-(== (exec { #or @[(-or 1 0 R) R] }) [1])
-(== (exec { #or @[(-or 1 1 R) R] }) [1])
+(== (exec *#or [(-or 0 0 R) R]) [0])
+(== (exec *#or [(-or 0 1 R) R]) [1])
+(== (exec *#or [(-or 1 0 R) R]) [1])
+(== (exec *#or [(-or 1 1 R) R]) [1])
 
 ; Find a more compact definition using variables
 (def or2 #your_answer)
 
-(== (exec { #or2 @[(-or 0 0 R) R] }) [0])
-(== (exec { #or2 @[(-or 0 1 R) R] }) [1])
-(== (exec { #or2 @[(-or 1 0 R) R] }) [1])
-(== (exec { #or2 @[(-or 1 1 R) R] }) [1])
+(== (exec *#or2 [(-or 0 0 R) R]) [0])
+(== (exec *#or2 [(-or 0 1 R) R]) [1])
+(== (exec *#or2 [(-or 1 0 R) R]) [1])
+(== (exec *#or2 [(-or 1 1 R) R]) [1])
 
 ; IMPLICATION (A => B = ~A \/ B)
 
 ; Compose NOT and OR to build implication.
-; Hint: use a focused query star that chains (-not ...) and (-or ...)
-; to produce (+impl ...).
+; Hint: use a reactive query star that chains (-not ...) and
+; (-or ...) to produce (+impl ...).
 (def impl (exec {
-  #not #or
-  @#your_answer }))
+  *#not *#or
+  #your_answer }))
 
-(== (exec { #impl @[(-impl 0 0 R) R] }) [1])
-(== (exec { #impl @[(-impl 0 1 R) R] }) [1])
-(== (exec { #impl @[(-impl 1 0 R) R] }) [0])
-(== (exec { #impl @[(-impl 1 1 R) R] }) [1])
+(== (exec *#impl [(-impl 0 0 R) R]) [1])
+(== (exec *#impl [(-impl 0 1 R) R]) [1])
+(== (exec *#impl [(-impl 1 0 R) R]) [0])
+(== (exec *#impl [(-impl 1 1 R) R]) [1])
 
 ; EXCLUDED MIDDLE (X \/ ~X = 1)
 
 ; Compute X \/ ~X for all X using NOT and OR.
 (def excluded_middle (exec {
-  #not #or
-  @#your_answer }))
+  *#not *#or
+  #your_answer }))
 
 (== #excluded_middle { [(+em 0 1)] [(+em 1 1)] })
 
@@ -80,5 +83,5 @@
 ; Hint: chain (-and Y Z R1) (-not R1 R2) (-and X R2 1)
 ; with output rays (x X) (y Y) (z Z).
 (show (exec {
-  #or #not #and
-  @#your_answer }))
+  *#or *#not *#and
+  #your_answer }))

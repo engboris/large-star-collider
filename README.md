@@ -72,7 +72,7 @@ Stellogen's constellation-based model supports multiple programming paradigms:
 ; Make x and y interact along (+f a) and (-f X)
 ; The conflict is resolved and propagated to the other term X
 ; It results in [a]
-(def result (exec #x @#y))
+(def result (exec #x #y))
 
 ; Display result [a] on screen
 (show #result)

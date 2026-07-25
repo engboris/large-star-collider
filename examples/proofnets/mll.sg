@@ -1,11 +1,10 @@
-(use "../milkyway/prelude.sg")
-
 ;  ============================================
 ;  MULTIPLICATIVE LINEAR LOGIC PROOF-STRUCTURES
 ;  ============================================
 ; MLL proof-structures is a representation of mathematical proofs
 ; for an elementary fragment of logic dealing with the most
 ; elementary mechanisms of logical implication.
+(use "../milkyway/prelude.sg")
 ;
 ; They are graphs with natural numbers as vertices which are linked
 ; by the following constructors:
@@ -116,10 +115,7 @@
 ;   [3, 6]
 ;
 ; This corresponds to the following execution in stellogen
-; in which [] is a way to initiate a starting point in computation
-(def comp (exec #x @[(-3 X) (+3 X)]))
-(def res { [(+3 X) (+6 X)] })
-(~= #comp #res)
+(~= (exec #x) [(+3 X) (+6 X)])
 
 ; as for the proof of identity (A ⊗ B) -o (A ⊗ B):
 ;
@@ -132,100 +128,57 @@
 ;   |____|
 ;     cut
 ;
-;   it becomes (shared with the check phase, which types it below)
+; it is represented by:
+;
 (object proof? {
   [(+(⅋ 1 2) [l|X]) (+(⊗ 3 4) [l|X])]
   [(+(⅋ 1 2) [r|X]) (+(⊗ 3 4) [r|X])]
 })
 
-; Actually, all rays could have a unique natural number as head symbol and
-; it would still work the same
-
 ;  ========================================================
 ;  SUCCESSFUL TYPING
 ;  ========================================================
-; We want to check that we have a proof of identity
-; (A ⊗ B) -o (A ⊗ B)
-; with the previous constellation
-#proof?
+; We want to check that the previous constellation is a proof
+; of identity
 
-; We do it in two steps.
-; 1. checking the structure of the candidate
-; 2. checking that the duality of variables is coherent
-
-; Specification with tests returning [ok] when interacting
+; Specification with four tests returning [ok] when interacting
 ; with a constellation having the shape of a proof of
 ; (_ ⊗ _) ⊸ (_ ⊗ _)
-; Each test is a separate constellation in the galaxy.
-§(spec (⊸ (⊗ A B) (⊗ C D))
-  {@[(- (var A)) (- (var B)) (+ (⊗ A B))]
+(spec (⊸ (⊗ A B) (⊗ C D))
+  {[(- (var A)) (- (var B)) (+ (⊗ A B))]
    [(- (var C))] [(- (var D)) (+ (⅋ C D))]
-   [(- (⊗ A B)) +concl] [(- (⅋ C D))]
-   [-concl ok]}
-  {@[(- (var A)) (- (var B)) (+ (⊗ A B))]
+   [(- (⊗ A B)) ok] [(- (⅋ C D))]}
+  {[(- (var A)) (- (var B)) (+ (⊗ A B))]
    [(- (var C))] [(- (var D)) (+ (⅋ C D))]
-   [(- (⊗ A B))] [+concl (- (⅋ C D))]
-   [-concl ok]}
-  {@[(- (var A)) (- (var B)) (+ (⊗ A B))]
+   [(- (⊗ A B))] [ok (- (⅋ C D))]}
+  {[(- (var A)) (- (var B)) (+ (⊗ A B))]
    [(- (var D))] [(- (var C)) (+ (⅋ C D))]
-   [(- (⊗ A B)) +concl] [(- (⅋ C D))]
-   [-concl ok]}
-  {@[(- (var A)) (- (var B)) (+ (⊗ A B))]
+   [(- (⊗ A B)) ok] [(- (⅋ C D))]}
+  {[(- (var A)) (- (var B)) (+ (⊗ A B))]
    [(- (var D))] [(- (var C)) (+ (⅋ C D))]
-   [(- (⊗ A B))] [+concl (- (⅋ C D))]
-   [-concl ok]})
+   [(- (⊗ A B))] [ok (- (⅋ C D))]})
 
-; Check if proof? satisfies the test-based specification.
-; The adapters only serve the typing, so they live in the check phase.
-§(def adapters {
-  [(-(⅋ 1 2) [l|X]) (+ (var 1))]
-  [(-(⅋ 1 2) [r|X]) (+ (var 2))]
-  [(-(⊗ 3 4) [l|X]) (+ (var 3))]
-  [(-(⊗ 3 4) [r|X]) (+ (var 4))]
+; Check if the constellation satisfies the specification.
+; The adapters are shared objects consumed by the typing below.
+(object adapters {
+  [(-(⅋ 1 2) [l|X]) (+ (var a))]
+  [(-(⅋ 1 2) [r|X]) (+ (var b))]
+  [(-(⊗ 3 4) [l|X]) (+ (var c))]
+  [(-(⊗ 3 4) [r|X]) (+ (var d))]
 })
-§(def proof?+adapters (exec @#proof? #adapters))
 
-; Linear type assertion: proof is action, test has its own focus.
-; * marks every star of both sides consumable (used at most once).
-(macro (::lin Tested Test)
-  §(forall Test T
-    (== @(exec *{ #Tested #T }) ok)))
-
-(::lin proof?+adapters (⊸ (⊗ 1 2) (⊗ 3 4)))
-
-; Check if duality is coherent
-; TODO
+(object proof?+adapters (exec #proof? #adapters))
+(:: proof?+adapters (⊸ (⊗ a b) (⊗ c d)))
 
 ;  ========================================================
 ;  FAILING TYPING
 ;  ========================================================
 
-§(spec (⊗ A B)
-  {@[(- (var A)) (- (var B)) (+ (⊗ A B))]
+(spec (⊗ A B)
+  {[(- (var A)) (- (var B)) (+ (⊗ A B))]
    [(- (⊗ A B)) ok]})
 
-§(def proof? [(+1 X) (+2 X)])
-§(def adapters { [(-1 X) (+ (var 1))] [(-2 X) (+ (var 2))] })
-§(def proof?+adapters (exec @#proof? #adapters))
-;(::lin proof?+adapters (⊗ 1 2)) ; does not typecheck
-
-;  ========================================================
-;  COMPRESSED TESTS
-;  ========================================================
-; Actually, constellations corresponding to proofs
-; have internal connections which could be compressed
-; by pre-executing them, thus avoiding unecessary computation.
-; The two specifications above become:
-
-§(spec (comp-o (⊗ A B) (⊗ C D))
-  {@[(- (var A)) (- (var B)) +concl] [(- (var C))] [(- (var D))]
-   [-concl ok]}
-  {@[(- (var A)) (- (var B))] [(- (var C))] [(- (var D)) +concl]
-   [-concl ok]}
-  {@[(- (var A)) (- (var B)) +concl] [(- (var D))] [(- (var C))]
-   [-concl ok]}
-  {@[(- (var A)) (- (var B))] [(- (var D))] [(- (var C)) +concl]
-   [-concl ok]})
-
-§(spec (comp-⊗ A B)
-  {@[(- A) (- B) ok]})
+(object proof? [(+1 X) (+2 X)])
+(object adapters { [(-1 X) (+ (var a))] [(-2 X) (+ (var b))] })
+(object proof?+adapters (exec #proof? #adapters))
+;(:: proof?+adapters (⊗ a b)) ; does not typecheck

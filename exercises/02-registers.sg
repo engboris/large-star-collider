@@ -7,8 +7,10 @@
 ; temporary name: first rename (-old X) (+tmp X), then set
 ; the new value (-tmp X) (+new val).
 ;
-; To duplicate a register into two, use a group { ... } of two
-; action stars in a single step so both interact with the same state.
+; A plain (reactive) step star is consumed by its first use. To
+; duplicate a register, or to update several registers with one
+; star, mark the step as a catalyst (*{ ... } or *[ ... ]):
+; catalysts are reusable and are dropped from the result.
 
 (show (then
   ;represents a register with value 0

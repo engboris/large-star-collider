@@ -1,10 +1,10 @@
 ; Regression test for variable capture in fusion renaming.
 ; Star A's R must become 5 (via t), star B's R must become 7 (via u).
-; Both stars name their local variable R: after they merge into the
-; state, the renaming must keep the two variables distinct.
+; Both stars name their local variable R: after they merge, the
+; renaming must keep the two variables distinct.
 (show (exec
   {[(-a) (+t R) (o1 R)]
    [(-b) (+u R) (o2 R)]
    [(-t 5)]
    [(-u 7)]}
-  @[(+a) (+b)]))
+  [(+a) (+b)]))

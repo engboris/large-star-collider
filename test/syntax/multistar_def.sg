@@ -6,7 +6,7 @@
   [(-add X Y Z) (+add (s X) Y (s Z))])
 
 ; Test it works: 2 + 2 = 4
-(== @(exec @[(-add (s (s 0)) (s (s 0)) R) R] #add) (s (s (s (s 0)))))
+(== (exec [(-add (s (s 0)) (s (s 0)) R) R] *#add) (s (s (s (s 0)))))
 
 ; Single star def still works
 (def single [(+f a)])
@@ -17,5 +17,5 @@
   [(+add2 0 Y Y)]
   [(-add2 X Y Z) (+add2 (s X) Y (s Z))]})
 
-(== @(exec @[(-add2 (s 0) (s 0) R) R] #add2) (s (s 0)))
-(== @(exec @[(-add (s 0) (s 0) R) R] #add) (s (s 0)))
+(== (exec [(-add2 (s 0) (s 0) R) R] *#add2) (s (s 0)))
+(== (exec [(-add (s 0) (s 0) R) R] *#add) (s (s 0)))

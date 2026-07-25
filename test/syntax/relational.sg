@@ -1,25 +1,24 @@
-
 (def add {
   [(+add 0 Y Y)]
   [(-add X Y Z) (+add (s X) Y (s Z))]})
 
-(def tested (exec { #add @[(-add 0 0 R) R] }))
+(def tested (exec *#add [(-add 0 0 R) R]))
 (== #tested 0)
 
-(def tested (exec { #add @[(-add (s 0) 0 R) R] }))
+(def tested (exec *#add [(-add (s 0) 0 R) R]))
 (== #tested (s 0))
 
-(def tested (exec { #add @[(-add 0 (s 0) R) R] }))
+(def tested (exec *#add [(-add 0 (s 0) R) R]))
 (== #tested (s 0))
 
-(def tested (exec { #add @[(-add (s (s 0)) (s (s 0)) R) R] }))
+(def tested (exec *#add [(-add (s (s 0)) (s (s 0)) R) R]))
 (== #tested (s (s (s (s 0)))))
 
-(def tested (exec { #add @[(-add (s (s 0)) R (s (s 0))) R] }))
+(def tested (exec *#add [(-add (s (s 0)) R (s (s 0))) R]))
 (== #tested 0)
 
-(def tested (exec { #add @[(-add (s (s 0)) R (s (s (s 0)))) R] }))
+(def tested (exec *#add [(-add (s (s 0)) R (s (s (s 0)))) R]))
 (== #tested (s 0))
 
-(def tested (exec { #add @[(-add (s (s 0)) R (s (s (s (s 0))))) R] }))
+(def tested (exec *#add [(-add (s (s 0)) R (s (s (s (s 0))))) R]))
 (== #tested (s (s 0)))

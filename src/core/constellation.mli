@@ -70,15 +70,20 @@ end
 
 (** {1 Marked Stars and Constellations} *)
 
-(** Stars marked as either state (to be transformed) or action (rules), each
-    independently tagged consumable (linear) or reusable. *)
+(** Stars marked as reactive (linear, mutually interacting, part of the result),
+    catalyst (duplicated at each use, inert toward other catalysts, dropped from
+    the result), or seed (a reactive star tried first when the executor picks a
+    starting point). *)
 module Marked : sig
-  (** A marked star is either a state or an action; the bool tracks whether it
-      is consumable (used at most once per execution). *)
+  (** A marked star is reactive, a catalyst, or a seed *)
   type star =
-    | State of Raw.star * bool
-      (** State stars are transformed during execution *)
-    | Action of Raw.star * bool  (** Action stars define transformation rules *)
+    | Reactive of Raw.star
+      (** Reactive stars are the solution: consumed by reacting *)
+    | Catalyst of Raw.star
+      (** Catalysts are solicited by reactive rays and persist *)
+    | Seed of Raw.star
+      (** A reactive star the executor tries first as a starting point;
+          otherwise behaves exactly like a plain reactive star *)
 
   val equal_star : star -> star -> bool
 
@@ -90,42 +95,29 @@ module Marked : sig
   (** Map a function over the rays in a star *)
   val map : f:(ray -> ray) -> star -> star
 
-  (** Create a non-linear action star from a raw star *)
-  val make_action : Raw.star -> star
+  (** Mark a raw star reactive *)
+  val make_reactive : Raw.star -> star
 
-  (** Create a non-linear state star from a raw star *)
-  val make_state : Raw.star -> star
+  (** Mark all raw stars reactive *)
+  val make_reactive_all : Raw.constellation -> constellation
 
-  (** Mark all raw stars as non-linear actions *)
-  val make_action_all : Raw.constellation -> constellation
+  (** Turn a marked star into a catalyst *)
+  val make_catalyst : star -> star
 
-  (** Mark all raw stars as non-linear states *)
-  val make_state_all : Raw.constellation -> constellation
+  (** Turn every star of a constellation into a catalyst *)
+  val make_catalyst_all : constellation -> constellation
 
-  (** Remove marking (both State/Action and linear) from a star *)
+  (** Turn a marked star into a seed *)
+  val make_seed : star -> star
+
+  (** Turn every star of a constellation into a seed *)
+  val make_seed_all : constellation -> constellation
+
+  (** Remove marking from a star *)
   val remove : star -> Raw.star
 
   (** Remove marking from all stars *)
   val remove_all : constellation -> Raw.constellation
-
-  (** Whether a star is consumable (linear) *)
-  val is_linear : star -> bool
-
-  (** Set the linear flag, preserving the State/Action tag and content *)
-  val set_linear : bool -> star -> star
-
-  (** Set the linear flag on every star, preserving each one's State/Action tag
-  *)
-  val set_linear_all : bool -> constellation -> constellation
-
-  (** Force State, preserving each star's existing linear flag *)
-  val refocus : star -> star
-
-  (** [refocus] applied to every star *)
-  val refocus_all : constellation -> constellation
-
-  (** Normalize: remove marking and re-mark all as non-linear actions *)
-  val normalize_all : constellation -> constellation
 end
 
 (** {1 Utilities} *)
@@ -188,10 +180,32 @@ val replace_indices : int -> ray -> ray
     consumed. *)
 val injective_renaming : int -> ray list -> (ray -> ray) * int
 
-(** Try to match two polarized rays, returning substitution if successful *)
+(** {1 Ground Guards} *)
+
+(** A [!X] in the source becomes a [%!] wrapper around the variable: a position
+    that must be ground before the enclosing ray may interact. Substitution goes
+    through the wrapper, so the requirement transfers to whatever fills the
+    position. *)
+
+(** Whether a ray contains no variable *)
+val is_ground : ray -> bool
+
+(** Erase guard wrappers (guards restrict when a ray may interact, never what it
+    unifies with) *)
+val strip_guards : ray -> ray
+
+(** Whether every guarded position of the ray is ground *)
+val ray_eligible : ray -> bool
+
+(** Drop guards whose position has become ground *)
+val simplify_guards : ray -> ray
+
+(** Try to match two polarized rays (ignoring guards), returning substitution if
+    successful *)
 val raymatcher : ray -> ray -> StellarRays.substitution option
 
-(** Base observation for [~=]: structural unifiability, ignoring polarity *)
+(** Base observation for [~=]: structural unifiability, ignoring polarity and
+    guards *)
 val terms_unifiable : ray -> ray -> bool
 
 (** Find a fresh variable not in the given list *)

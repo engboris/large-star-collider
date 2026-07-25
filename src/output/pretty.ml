@@ -34,9 +34,15 @@ let rec string_of_ray = function
       List.map elements ~f:string_of_ray |> String.concat ~sep:" "
     in
     Printf.sprintf "[%s]" elems_str
+  | Func ((Null, "*"), [ inner ]) ->
+    (* Catalyst marker *)
+    Printf.sprintf "*%s" (string_of_ray inner)
   | Func ((Null, "@"), [ inner ]) ->
-    (* Focus marker *)
+    (* Seed marker *)
     Printf.sprintf "@%s" (string_of_ray inner)
+  | Func ((Null, "%!"), [ inner ]) ->
+    (* Ground guard on a position *)
+    Printf.sprintf "!%s" (string_of_ray inner)
   | Func ((Null, "%params"), [ rays; bans ]) ->
     (* Star with constraints *)
     Printf.sprintf "%s || %s" (string_of_ray rays) (string_of_ray bans)

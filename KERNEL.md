@@ -14,9 +14,9 @@ the language.**
 The kernel has two parts with deliberately different semantics:
 
 - The **object kernel** (part I): stellar resolution proper. Terms, rays,
-  stars, constellations, focus, constraints, and the fusion dynamics.
-  Unordered, interactive, possibly non-terminating. Anything that
-  computes lives here.
+  stars, constellations, the reactive/catalyst distinction, ground
+  guards, constraints, and the fusion dynamics. Unordered, interactive,
+  possibly non-terminating. Anything that computes lives here.
 - The **meta kernel** (part II): the functional glue that assembles
   constellations, runs them, and compares the results. Deterministic and
   ordered. It never computes anything itself.
@@ -45,9 +45,14 @@ Lexical rules:
 - A token starting with an uppercase letter or `_` is a **variable**
   (`X`, `Result`, `_Tail`). The bare token `_` is a wildcard: each
   occurrence stands for a fresh variable.
+- A token starting with `!` followed immediately by an uppercase letter
+  or `_` is a **guarded variable** (`!X`, `!_Tail`): the same variable,
+  wrapped with a ground guard (1.4).
 - Any other token is a **symbol** (`a`, `bob`, `0`, `s`, `+add`, `%cons`).
   Symbols may contain any characters except whitespace, the delimiters
   `( ) [ ] { }`, `|` and `;`; they may not start with `'`, `"`, `@` or `#`.
+  `@` is not otherwise a valid character anywhere in the source: it is
+  simply not lexed, so any occurrence is a lexer error.
 - `; ...` is a line comment. There are no block comments; stack `;` lines.
 - `"chars"` is a string literal with escapes `\n \t \\ \"`.
 
@@ -55,6 +60,7 @@ Grammar of terms:
 
 ```
 term ::= VAR                    variable, local to its star
+       | !VAR                   sugar: guarded variable (1.4)
        | sym                    constant (0-ary function)
        | (sym term ...)         function application
        | [term ...]             sugar: cons list (%cons/%nil, see part III)
@@ -74,7 +80,8 @@ the name `add` with polarities positive, negative, neutral.
 A **ray** is a term used as an interaction point of a star. Two function
 symbols are **compatible** when they have the same name and dual
 polarities (`+`/`-`), or are both neutral. Two rays can fuse when they are
-unifiable under this compatibility relation and both are polarized.
+unifiable under this compatibility relation, both are polarized, and both
+are **eligible** (1.4).
 
 Precisely:
 
@@ -84,7 +91,10 @@ Precisely:
    inside arguments must also invert.
 2. **A ray is polarized when a polarized symbol occurs anywhere in it**,
    at any depth. A neutral-headed ray with a polarized subterm is
-   therefore eligible for fusion.
+   therefore eligible for fusion (modulo 1.4).
+3. **Guards are erased before unification.** A guarded variable `!X`
+   unifies exactly as `X` would; guards restrict *when* a ray may fuse,
+   never *what* it may fuse with.
 
 ### 1.3 Stars and constraints
 
@@ -112,87 +122,142 @@ star:
   first component but differ on the second. It forces all `slice`
   assignments to the same box to agree.
 
-### 1.4 Constellations and focus
+### 1.4 Ground guards
 
-A **constellation** is a finite multiset of stars. Each star carries two
-independent tags: focus (`@`), which drives execution, and linearity
-(`*`), which only matters for actions (1.5):
+A guarded variable `!X` (1.1) marks a position that must be **ground**
+(no variables left in it, after every substitution collected so far) before
+the ray holding it may take part in a fusion.
+
+- **Erasure.** Guards play no role in unification: fusing a ray strips
+  every guard first (1.2.3), so `!X` unifies exactly as `X` would.
+- **Eligibility.** A ray is **eligible** exactly when every guarded
+  position inside it is ground. A ray with no guards at all is always
+  eligible. Eligibility is checked before a ray is offered as a fusion
+  candidate, in either role (the reactive ray looking for a partner, or
+  the partner ray it is tested against).
+- **Inheritance under substitution.** A guard survives the substitution
+  that discharges other variables around it: applying `X := (s Y)` to
+  `!X` yields `(s !Y)`, moving the guard onto `Y` rather than dropping
+  it. Internally this is a `%!` wrapper around the guarded subterm, so
+  `!X` under that substitution really is `(%! (s Y))` reduced to
+  `(s (%! Y))` by pushing the wrapper down to the variable.
+- **Discharge.** Once a guarded position becomes ground, its guard is
+  dropped (simplified away): a wrapper around `(s (s 0))`, once every
+  variable under it is solved, reduces to plain `(s (s 0))`, and no
+  `%!` wrapper survives into a printed result.
+
+Guards are the kernel's only synchronization device: they say nothing
+about what a ray unifies with, only when it is allowed to try.
+
+### 1.5 Constellations: reactive stars and catalysts
+
+A **constellation** is a finite multiset of stars. Each star carries
+exactly one of two marks, which decides its role in execution (1.6):
 
 ```
-cell  ::= star | @star | *star | @*star | *@star
-const ::= cell | { cell ... } | @{ cell ... } | *{ cell ... }
+cell  ::= star | *star
+const ::= cell | { cell ... } | *{ cell ... }
 ```
 
-- A star marked `@` is a **state**: part of the data being transformed.
-- An unmarked star is an **action**: a rule that transforms states.
-- A star marked `*` is **linear** (consumable): see 1.5. Orthogonal to
-  `@`/unmarked, so `@*star` and `*@star` are the same cell.
+- An unmarked star is **reactive**: it exists once, is a candidate to
+  fuse (with another reactive star, with a catalyst, or with itself),
+  and is consumed the moment one of its rays reacts.
+- A star marked `*` is a **catalyst**: reusable (a fresh renamed copy is
+  produced for every fusion it takes part in), passive (it never
+  initiates a search for a partner; a reactive ray must come looking for
+  it), inert toward other catalysts (two catalysts never fuse with each
+  other), and dropped from the result once execution ends.
 
-`@` on a group focuses every star inside, hereditarily, overriding each
-star's State/Action tag while leaving its `*` tag untouched: focus is
-idempotent and distributes through `{...}`. `*` on a group works the same
-way on the other axis: it marks every star inside linear, leaving each
-one's State/Action tag untouched. The two compose freely and in either
-order: `@*{ ... }` and `*@{ ... }` mark every star both focused and
-linear.
+`*` on a group marks every star inside a catalyst, hereditarily: it
+distributes through `{...}` and is idempotent. There is no mark for
+"reactive" beyond the absence of `*`, since reactive is the default for
+every star.
 
 Constellations are unordered as far as the semantics is concerned; the
 implementation keeps them in some order, and observable orderings
 (printing, `==`) reflect that order without it being part of the
 specification. See section 4.1.
 
-### 1.5 Execution
+### 1.6 Execution
 
-Execution is **one operation**: saturation of a focused interaction space.
-There is a single top-level form, `exec`; the structural discipline of an
-action star is a per-star tag, not a mode of the call, and staging is not
-a variant at all:
+Execution is **one operation**: saturation of a soup of stars under a
+single fusion rule. There is a single top-level form, `exec`; whether a
+star is reactive or a catalyst is a per-star tag, not a mode of the call,
+and staging is not a variant at all:
 
-- **The `*` tag: the structural discipline of an action star.** Every
-  action enjoys weakening (actions left unused are discarded; the result
-  of an execution consists of the final state stars only) and, by
-  default, contraction: an action can be copied and used any number of
-  times, as if under `!`. A star tagged `*` (linear) grants no
-  contraction: once it fuses it is removed from the action pool (if one
-  scan finds several alternative fusions of the same action, all their
-  results are kept as branches, but the action is consumed). `*` and `@`
-  are orthogonal tags on the same star; `*` only affects actions; a state
-  star may carry it but it has no observable effect, since a state's rays
-  are already consumed as they fuse (1.4).
+- **The fusion rule.** A reactive ray may fuse with any dual, unifiable,
+  eligible (1.4) ray, wherever that ray is found: in another reactive
+  star, in a catalyst, or in the very same star (an **internal cut**: two
+  dual rays of one star cancelling each other, with no renaming since
+  they already share the star's scope). A fusion consumes the matched
+  pair of rays, applies the resulting substitution to what remains of
+  both stars, and merges the remainder into one new star, exactly as in
+  1.3's fusion mechanics; an incoherent result (1.3) is discarded.
+- **Consumption by role.** A reactive star involved in a fusion is
+  consumed by it (used once, gone). A catalyst involved in a fusion is
+  not consumed: the specific copy that fused is spent, but the catalyst
+  itself remains available, ready to be copied again for the next
+  fusion that solicits it.
+- **No weakening on reactive stars.** A reactive star that saturation
+  never gets to react stays in the result untouched. Nothing is silently
+  discarded except catalysts, which are dropped from the result
+  precisely because they were never part of the reactive material being
+  computed.
+- **Branching.** If a reactive ray has several dual eligible partners at
+  once (several matches across reactive stars and catalysts combined),
+  execution does not pick one arbitrarily: it fuses with **all** of them
+  in the same step, producing one new star per partner. All of these new
+  stars join the single continuing multiset side by side (this is not a
+  fork into separate parallel results: there is still exactly one
+  ongoing constellation). Every reactive partner that matched is
+  consumed, alongside the source star; every catalyst that matched
+  persists, since a catalyst is never exhausted by being used.
 - **Staging is derived notation.** `(then c1 c2 ...)` is a left fold of
   executions, elaborated away before evaluation (part II); it never
   touches the execution engine.
 
 Operationally, execution proceeds as follows:
 
-1. Split the input constellation into actions and states by their mark.
-2. Scan the states. For a state star having a polarized ray that admits at
-   least one fusion against some action ray: perform **all** fusions of
-   that one ray (against every compatible ray of every action), remove the
-   state star, and add the fused stars to the states. Remove every
-   `*`-tagged action consumed by these fusions.
-3. A **fusion** of a state star and an action star along compatible rays
-   `r` and `r'`: rename the two stars apart, unify `r` with `r'`, drop the
-   matched pair, apply the substitution to the remaining rays of both
-   stars, and merge them (with their constraints) into one new star.
-   Discard the result if its constraints are incoherent (1.3).
-4. Repeat until no state star can interact (saturation). Empty stars are
-   dropped. The final states are the result; remaining actions are
+1. Split the input constellation into catalysts and reactive stars by
+   their mark.
+2. Look for an internal cut first: a reactive star with two dual,
+   unifiable, eligible rays of its own. If several reactive stars have
+   one, the first one found (implementation order, not specified) has
+   that one star replaced by its cancellation (or, per the branching
+   rule, by one cancelled star per internal partner if its chosen ray
+   has several).
+3. If no internal cut applies, scan the reactive stars for one holding
+   an eligible ray that has at least one dual, unifiable, eligible
+   partner ray among the *other* reactive stars and the catalysts taken
+   together. Perform **all** such fusions for that one ray at once
+   (the branching rule above); remove the source reactive star and
+   every reactive partner that matched; add every fused star produced.
+   Catalysts that matched are never removed by this step.
+4. Repeat from step 2 until no reactive star has any eligible ray with
+   an internal or external dual partner (saturation). Empty stars are
+   dropped. The final reactive stars are the result; catalysts are
    discarded.
 
-The order in which states and candidate fusions are picked is
-implementation-determined and not part of the specification; only the
-saturation semantics is.
+The order in which reactive stars and candidate fusions are picked is
+implementation-determined and not part of the specification, except that
+internal cuts are tried before cross-star fusions (a scheduling choice,
+not part of the result's meaning): only the saturation semantics is.
 
-The result of `exec` is re-marked as all-action, non-linear (unfocused,
-and any `*` tags on the input are dropped), which is why chaining requires
-re-focusing; `then` does exactly that.
+The result of `exec` is re-marked as all-reactive (any `*` tags on the
+input are dropped), and is used directly as the next stage's input; there
+is no re-focusing step, since focus no longer exists. `then` chains
+`exec` calls with no extra marking (2.2).
 
 Execution may diverge; that is a property of the object language,
-accepted. Termination guarantees are user-space theorems about restricted
-fragments, not kernel features.
+accepted, and it requires a catalyst somewhere: a constellation with no
+catalysts always terminates, because every fusion strictly consumes two
+rays from a fixed, finite, never-duplicated pool of reactive material.
+Divergence needs a catalyst repeatedly feeding a computation fresh copies
+of itself, for example a recursive rule set marked `*` chased through a
+query. Termination guarantees for fragments that do use catalysts are
+user-space theorems, not kernel features.
 
-### 1.6 What is not in the object kernel
+### 1.7 What is not in the object kernel
 
 No numbers or arithmetic, no booleans or conditionals, no strings as
 anything but term sugar, no ordering of stars, no notion of function call,
@@ -217,9 +282,8 @@ or a constellation if it uses the encodings of part III).
 | `(def name e ...)` | bind | naming things |
 | `(def (name p ...) e)` | parametric bind | naming families of things |
 | `#name`, `#(name a ...)` | reference | using named things |
-| `@e` | focus | marking state (shared with the object kernel) |
-| `*e` | linear | marking consumable actions (shared with the object kernel) |
-| `(exec e ...)` | run | running interactions; each star's own `*` tag decides contraction |
+| `*e` | catalyst | marking a reusable, passive star (shared with the object kernel) |
+| `(exec e ...)` | run | running interactions; each star's own mark decides its role |
 | `(then e1 e2 ...)` | staged run | derived form; a fold of `exec` |
 | `(show e ...)` | display | observation |
 | `(== e1 e2 [msg])` | assert equal | base observation (part IV) |
@@ -227,7 +291,7 @@ or a constellation if it uses the encodings of part III).
 | `(forall g X e)` | iterate over a galaxy | the one binder; the forall of orthogonality |
 | `(use "path")` | import | files are files |
 | `(macro (name X ...) body ...)` | fixed-arity rewrite | the tower's growth mechanism |
-| `(spec name e ...)` | bind, marking intent | alias of `def`; a fixed-arity macro cannot alias a variadic form |
+| `(spec name e ...)` | bind a specification | like `def` but check-phase only; a fixed-arity macro cannot alias a variadic form |
 
 What is deliberately absent: closures, higher-order functions, arithmetic,
 conditionals, general recursion, mutable state, `eval` (term to running
@@ -253,27 +317,29 @@ Identifiers are rays, so definitions can be parametric:
 substitution to the stored expression. Binding a key that unifies with an
 existing key replaces that binding.
 
-`(spec ...)` is accepted wherever `def` is and behaves identically; it
-marks the intent that the defined thing is a test suite. It is a kernel
-form rather than a macro because `def` is variadic (galaxy formation) and
-macros are fixed-arity: no macro can faithfully alias it.
+`(spec ...)` is accepted wherever `def` is and binds identically; it marks
+the intent that the defined thing is a test suite. Because a specification
+only matters to type checking, a top-level `spec` is classified into the
+check phase on its own (as if it carried a `§`), so `sgen run` skips it
+while `sgen check` evaluates it. It is a kernel form rather than a macro
+because `def` is variadic (galaxy formation) and macros are fixed-arity: no
+macro can faithfully alias it.
 
 ### 2.2 `exec`, `then`
 
 `(exec e1 ... en)` evaluates its arguments, combines them into one
-constellation (groups and galaxies flatten), and saturates it as in 1.5:
-each action star contracts (can be reused) unless it carries its own `*`
-tag, in which case it is consumed after its first fusion. The result is
-an unfocused, non-linear constellation (1.5).
+constellation (groups and galaxies flatten), and saturates it as in 1.6:
+each star reacts or persists as a catalyst according to its own `*` tag.
+The result is an all-reactive constellation (1.6), with every `*` tag
+from the input gone.
 
 `(then c1 c2 ... cn)` is elaborated at read time into a left fold:
-`(then a b)` becomes `(exec b @a)`, and each further step executes
-against the previous result focused as state. Only the accumulator
-between steps is refocused; the final step is left unfocused, so the
-overall result is unfocused too, like any other `exec` result. It exists
-because ordering runs is glue that fixed-arity macros cannot express
-variadically; it is only special in head position (`then` remains an
-ordinary symbol inside terms).
+`(then a b)` becomes `(exec b a)`, and each further step executes
+against the accumulated result of the previous ones, with no refocusing:
+an `exec` result is already reactive, so it feeds the next stage as is.
+It exists because ordering runs is glue that fixed-arity macros cannot
+express variadically; it is only special in head position (`then`
+remains an ordinary symbol inside terms).
 
 ### 2.3 `forall`
 
@@ -328,8 +394,8 @@ encoding a **contract**. Shape checkers unify against these shapes, so the
 encoding must stay stable; changing it is a breaking change to every
 checker in user space.
 
-The `%`-prefixed names below, plus `@`, `*`, `#`, `!=` and `slice` in
-encoded positions, are reserved for the encoding.
+The `%`-prefixed names below, plus `*`, `#`, `!=` and `slice` in encoded
+positions, are reserved for the encoding.
 
 ### 3.1 Surface syntax to terms (read time)
 
@@ -342,13 +408,13 @@ encoded positions, are reserved for the encoding.
                       RAYLIST a %cons list of rays; BANLIST a %cons list
                       of ("!=" t1 t2) / ("slice" t1 t2) terms
 #e                 -> ("#" e')                               reference marker
-@e                 -> ("@" e')                               focus marker
-*e                 -> ("*" e')                               linear marker
+*e                 -> ("*" e')                               catalyst marker
+!X                 -> ("%!" X)                               ground guard (1.4)
 (f a ...)          -> (f a' ...)                             applications are themselves
 ```
 
-Every surface form embeds in term position: `@`, `*`, `#` and `{...}`
-occurring inside a term become plain `"@"`-, `"*"`-, `"#"`- and
+Every surface form embeds in term position: `*`, `#`, `!X` and `{...}`
+occurring inside a term become plain `"*"`-, `"#"`-, `"%!"`- and
 `%group`-headed subterms.
 This is what lets a macro splice one body into both code position and term
 position; no `quote` primitive is needed, and a `quote` notation, if ever
@@ -360,25 +426,23 @@ Evaluation results are terms in the same vocabulary, and the language
 reads them back by the same rules:
 
 ```
-action star [r1 ... rn]   -> (%cons r1 (... (%cons rn %nil)))
+reactive star [r1 ... rn] -> (%cons r1 (... (%cons rn %nil)))
 star with bans            -> (%params RAYLIST BANLIST)
   ban (!= t1 t2)          -> ("!=" t1 t2), in a %cons list
   ban (slice t1 t2)       -> ("slice" t1 t2), in a %cons list
-state star                -> ("@" STAR)
-linear star               -> ("*" STAR)
-state, linear star        -> ("@" ("*" STAR))  or  ("*" ("@" STAR))
+catalyst star             -> ("*" STAR)
 constellation, one star   -> STAR              (not wrapped)
 constellation, n stars    -> (%group S1 ... Sn)
 galaxy                    -> (%galaxy T1 ... Tn)
 ```
 
-Reading back: `%galaxy` and `%group` flatten and concatenate; `"@"`
-forces every star it wraps to state, preserving each one's own `"*"` tag;
-`"*"` forces every star it wraps linear, preserving each one's own
-State/Action tag; the two wrappers commute, either nesting order reads
-back the same. A `%cons` list of rays is an action star; any other term
-is a single-ray action star. Ray polarities ride inside these terms as
-ordinary polarized symbols.
+Reading back: `%galaxy` and `%group` flatten and concatenate; `"*"`
+forces every star it wraps to be a catalyst. A `%cons` list of rays is a
+reactive star; any other term is a single-ray reactive star. Ray
+polarities ride inside these terms as ordinary polarized symbols. A
+guarded position inside a ray survives as a `"%!"`-headed subterm
+wherever it occurs, at any depth (1.4); it is not a property of the star
+or the ray as a whole, only of the specific position it wraps.
 
 ---
 
@@ -393,13 +457,15 @@ is spelling above them.
 ### 4.1 `==` : syntactic equality of results
 
 `(== e1 e2)` evaluates both sides, converts both to constellations, strips
-focus marks, and compares **syntactically**: same stars with the same rays
-and the same constraints, in the same order, with the same variable names.
-No unification, no reordering, no renaming. Consequences: `==` is
-focus-blind; it is order-sensitive, so it compares the order the
+the reactive/catalyst mark off every star, and compares **syntactically**:
+same stars with the same rays and the same constraints, in the same
+order, with the same variable names. No unification, no reordering, no
+renaming. Consequences: `==` does not care whether a star was reactive or
+a catalyst; it is order-sensitive, so it compares the order the
 implementation produced (fix the expected constellation from an actual
-run, or compare single-star results); and it is name-sensitive on
-variables.
+run, or compare single-star results); it is name-sensitive on variables;
+and it does not strip ground guards, so a `!X` still present in a result
+must be matched by a `!X` in the expected side.
 
 On failure the program aborts, reporting both sides and the source
 location. An optional third argument replaces the default message.
@@ -407,11 +473,13 @@ location. An optional third argument replaces the default message.
 ### 4.2 `~=` : polarity-blind structural unifiability
 
 `(~= e1 e2)` evaluates both sides and succeeds when **some ray of the
-first unifies with some ray of the second after all polarities are
-normalized away**. Polarity is ignored at every depth: `(~= (+f X)
-(+f a))` succeeds. The check is existential over rays, not a matching of
-whole constellations. Failure aborts with a report of both sides;
-optional third argument as above.
+first unifies with some ray of the second after all polarities and all
+ground guards are stripped away**. Polarity is ignored at every depth:
+`(~= (+f X) (+f a))` succeeds. Guards are ignored the same way unification
+already ignores them for fusion (1.2.3): `(~= (-f !X) (-f a))` succeeds
+just as `(~= (-f X) (-f a))` would. The check is existential over rays,
+not a matching of whole constellations. Failure aborts with a report of
+both sides; optional third argument as above.
 
 ### 4.3 The judgment contract
 
@@ -419,13 +487,24 @@ optional third argument as above.
 `==` or `~=` (usually under `forall`). Assertions are the only way
 anything reports pass or fail, so generic tooling counts failures
 identically across all practices, whatever their success conventions:
-an `ok` residue, annihilation (empty residue), witness shapes, linear
-checking via `*`. A typical practice defines its type assertion as
+an `ok` residue, annihilation (empty residue), witness shapes, or exact
+consumption checked by leaving everything markless. A typical practice
+defines its type assertion as
 
 ```stellogen
 (macro (:: Tested Test)
   (forall Test T
-    (== @(exec @#Tested #T) ok)))
+    (== (exec #Tested *#T) ok)))
+```
+
+with `Tested` reactive and `Test` a catalyst, so each test is consulted
+without being consumed by the interaction. A stricter practice can demand
+exact consumption instead, by leaving both sides markless:
+
+```stellogen
+(macro (::lin Tested Test)
+  (forall Test T
+    (== (exec #Tested #T) ok)))
 ```
 
 and this is user space, not a kernel form: each practice declares its own

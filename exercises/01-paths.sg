@@ -2,33 +2,33 @@
 ; Define each #your_answer so that the execution result equals [ok].
 ;
 ; A positive ray (+X) fuses with a negative ray (-X).
-; When a focused state star (@) interacts with an action star,
-; the matching rays disappear and the remaining rays merge.
+; When two stars fuse, the matching rays disappear and the
+; remaining rays merge into one star.
 
-; x1: The state @[-1 ok] needs something to consume -1 and leave ok.
+; x1: The star [-1 ok] needs something to consume -1 and leave ok.
 (def ans1 #your_answer)
-(== (exec { @[-1 ok] #ans1 }) [ok])
+(== (exec [-1 ok] #ans1) [ok])
 
-; x2: The state @[-1] can fuse with +1, and the star [+2]
+; x2: The star [-1] can fuse with +1, and the star [+2]
 ; needs someone to consume +2. Connect them in one star.
 (def ans2 #your_answer)
-(== (exec { @[-1] [+2] #ans2 }) [ok])
+(== (exec [-1] [+2] #ans2) [ok])
 
-; x3: @[-1 ok] and [-2 +3] are given. Provide the missing stars
+; x3: [-1 ok] and [-2 +3] are given. Provide the missing stars
 ; so that everything chains into [ok].
 (def ans3 #your_answer)
-(== (exec { @[-1 ok] [-2 +3] #ans3 }) [ok])
+(== (exec [-1 ok] [-2 +3] #ans3) [ok])
 
-; x4: The state has a compound ray (-f (g X)).
+; x4: The star has a compound ray (-f (g X)).
 ; Provide a star whose positive ray unifies with it.
 (def ans4 #your_answer)
-(== (exec { @[(-f (g X)) ok] #ans4 }) [ok])
+(== (exec [(-f (g X)) ok] #ans4) [ok])
 
-; x5: Multiple stars interact. The state @[(+g b) ok] needs
+; x5: Multiple stars interact. The star [(+g b) ok] needs
 ; the right negative rays to complete the path.
 (def ans5 #your_answer)
 (== (exec {
   [(+f a) (+f b)]
   [(+g a)]
-  @[(+g b) ok]
+  [(+g b) ok]
   #ans5 }) [ok])

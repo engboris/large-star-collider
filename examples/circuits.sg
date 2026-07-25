@@ -1,0 +1,42 @@
+; Boolean circuits.
+;
+; A circuit is a markless reactive net: each gate star fires once and
+; is consumed, each wire is the meeting of two dual rays. The truth
+; tables are catalysts (*). The !X guards make a gate wait until its
+; inputs are values instead of querying the tables relationally.
+
+(def semantics {
+  [(+not 1 0)] [(+not 0 1)]
+  [(+and 1 V V)] [(+and 0 V 0)]
+  [(+or 0 V V)] [(+or 1 V 1)]
+})
+
+; Contradiction (and A (not A)), constant 0.
+;
+;        +--- c1 --- not --- c3 ---+
+;  c0 ---|                         +--- and --- c4
+;        +--- c2 ------------------+
+(def contradiction {
+  [(-c0 X) (+c1 X) (+c2 X)]
+  [(-c1 X) (-not !X R) (+c3 R)]
+  [(-c3 X) (-c2 Y) (-and !X !Y R) (+c4 R)]
+  [(-c4 R) R]
+})
+
+(== (exec #contradiction (+c0 1) *#semantics) 0)
+(== (exec #contradiction (+c0 0) *#semantics) 0)
+
+; Excluded middle (or A (not A)), constant 1.
+;
+;        +--- c1 --- not --- c3 ---+
+;  c0 ---|                         +--- or --- c4
+;        +--- c2 ------------------+
+(def excluded_middle {
+  [(-c0 X) (+c1 X) (+c2 X)]
+  [(-c1 X) (-not !X R) (+c3 R)]
+  [(-c3 X) (-c2 Y) (-or !X !Y R) (+c4 R)]
+  [(-c4 R) R]
+})
+
+(== (exec #excluded_middle (+c0 1) *#semantics) 1)
+(== (exec #excluded_middle (+c0 0) *#semantics) 1)

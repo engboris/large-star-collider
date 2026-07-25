@@ -1,6 +1,8 @@
 ; Exercise 3 - Boolean Logic
 ; Implement boolean operations as constellations and verify them.
 ; Each operation takes boolean inputs (0 or 1) and produces a result.
+; Truth tables are catalysts (*): reusable and dropped from the
+; result; queries are plain reactive stars.
 
 ; NOT
 
@@ -8,13 +10,11 @@
   [(+not 0 1)]
   [(+not 1 0)] })
 
-(== (exec { #not @[(-not 0 R) R] }) [1])
-(== (exec { #not @[(-not 1 R) R] }) [0])
+(== (exec *#not [(-not 0 R) R]) [1])
+(== (exec *#not [(-not 1 R) R]) [0])
 
 ; Truth table of NOT
-(def table_not (exec {
-  #not
-  @[(-not X Y) (table_not X Y)] }))
+(def table_not (exec *#not [(-not X Y) (table_not X Y)]))
 (== #table_not { [(table_not 0 1)] [(table_not 1 0)] })
 
 ; AND
@@ -25,20 +25,20 @@
   [(+and 1 0 0)]
   [(+and 1 1 1)] })
 
-(== (exec { #and @[(-and 0 0 R) R] }) [0])
-(== (exec { #and @[(-and 0 1 R) R] }) [0])
-(== (exec { #and @[(-and 1 0 R) R] }) [0])
-(== (exec { #and @[(-and 1 1 R) R] }) [1])
+(== (exec *#and [(-and 0 0 R) R]) [0])
+(== (exec *#and [(-and 0 1 R) R]) [0])
+(== (exec *#and [(-and 1 0 R) R]) [0])
+(== (exec *#and [(-and 1 1 R) R]) [1])
 
 ; A more compact definition using variables
 (def and2 {
   [(+and 0 X 0)]
   [(+and 1 X X)] })
 
-(== (exec { #and2 @[(-and 0 0 R) R] }) [0])
-(== (exec { #and2 @[(-and 0 1 R) R] }) [0])
-(== (exec { #and2 @[(-and 1 0 R) R] }) [0])
-(== (exec { #and2 @[(-and 1 1 R) R] }) [1])
+(== (exec *#and2 [(-and 0 0 R) R]) [0])
+(== (exec *#and2 [(-and 0 1 R) R]) [0])
+(== (exec *#and2 [(-and 1 0 R) R]) [0])
+(== (exec *#and2 [(-and 1 1 R) R]) [1])
 
 ; OR
 
@@ -48,43 +48,43 @@
   [(+or 1 0 1)]
   [(+or 1 1 1)] })
 
-(== (exec { #or @[(-or 0 0 R) R] }) [0])
-(== (exec { #or @[(-or 0 1 R) R] }) [1])
-(== (exec { #or @[(-or 1 0 R) R] }) [1])
-(== (exec { #or @[(-or 1 1 R) R] }) [1])
+(== (exec *#or [(-or 0 0 R) R]) [0])
+(== (exec *#or [(-or 0 1 R) R]) [1])
+(== (exec *#or [(-or 1 0 R) R]) [1])
+(== (exec *#or [(-or 1 1 R) R]) [1])
 
 ; A more compact definition using variables
 (def or2 {
   [(+or 0 X X)]
   [(+or 1 X 1)] })
 
-(== (exec { #or2 @[(-or 0 0 R) R] }) [0])
-(== (exec { #or2 @[(-or 0 1 R) R] }) [1])
-(== (exec { #or2 @[(-or 1 0 R) R] }) [1])
-(== (exec { #or2 @[(-or 1 1 R) R] }) [1])
+(== (exec *#or2 [(-or 0 0 R) R]) [0])
+(== (exec *#or2 [(-or 0 1 R) R]) [1])
+(== (exec *#or2 [(-or 1 0 R) R]) [1])
+(== (exec *#or2 [(-or 1 1 R) R]) [1])
 
 ; IMPLICATION (A => B = ~A \/ B)
 
 ; Compose NOT and OR: negate A, then OR with B
 (def impl (exec {
-  #not #or
-  @[(-not X Y) (-or Y Z R) (+impl X Z R)] }))
+  *#not *#or
+  [(-not X Y) (-or Y Z R) (+impl X Z R)] }))
 
-(== (exec { #impl @[(-impl 0 0 R) R] }) [1])
-(== (exec { #impl @[(-impl 0 1 R) R] }) [1])
-(== (exec { #impl @[(-impl 1 0 R) R] }) [0])
-(== (exec { #impl @[(-impl 1 1 R) R] }) [1])
+(== (exec *#impl [(-impl 0 0 R) R]) [1])
+(== (exec *#impl [(-impl 0 1 R) R]) [1])
+(== (exec *#impl [(-impl 1 0 R) R]) [0])
+(== (exec *#impl [(-impl 1 1 R) R]) [1])
 
 ; EXCLUDED MIDDLE (X \/ ~X = 1)
 
 (def excluded_middle (exec {
-  #not #or
-  @[(-not X R1) (-or R1 X R2) (+em X R2)] }))
+  *#not *#or
+  [(-not X R1) (-or R1 X R2) (+em X R2)] }))
 
 (== #excluded_middle { [(+em 0 1)] [(+em 1 1)] })
 
 ; For which X, Y, Z is X /\ ~(Y /\ Z) true?
 
 (show (exec {
-  #or #not #and
-  @[(-and Y Z R1) (-not R1 R2) (-and X R2 1) (x X) (y Y) (z Z)] }))
+  *#or *#not *#and
+  [(-and Y Z R1) (-not R1 R2) (-and X R2 1) (x X) (y Y) (z Z)] }))

@@ -1,23 +1,25 @@
 (use "../milkyway/prelude.sg")
 
-§(spec binary
+; type of words made of 0 and 1
+(spec binary
   {[(-i []) ok]
    [(-i [0|X]) (+i X)]
    [(-i [1|X]) (+i X)]})
 
-;input words, shared between the check and run phases
-(object e (+i []))           (:: e binary)
-(object 0000 (+i [0 0 0 0])) (:: 0000 binary)
-(object 0110 (+i [0 1 1 0])) (:: 0110 binary)
-(object 1110 (+i [1 1 1 0])) (:: 1110 binary)
+; input words
+(object e (+i []))           (::* e binary)
+(object 0000 (+i [0 0 0 0])) (::* 0000 binary)
+(object 0110 (+i [0 1 1 0])) (::* 0110 binary)
+(object 1110 (+i [1 1 1 0])) (::* 1110 binary)
 
+; some macros for readable state machines
 (def (initial Q) [(-i W) (+a W [] Q)])
 (def (accept Q) [(-a [] [] Q) accept])
 (def (if read C1 on Q1 then Q2 and push C2) [(-a [C1|W] S Q1) (+a W [C2|S] Q2)])
 (def (if read C1 with C2 on Q1 then Q2) [(-a [C1|W] [C2|S] Q1) (+a W S Q2)])
 (def (if on Q1 then Q2) [(-a W S Q1) (+a W S Q2)])
 
-(def a1 {
+(def a {
   #(initial q0)
   #(accept q0)
   #(accept q1)
@@ -27,9 +29,11 @@
   #(if read 0 with 0 on q1 then q1)
   #(if read 1 with 1 on q1 then q1)})
 
+; erase leftover of computation that didn't reach
+; the accepting state
 (def kill (-a _ _ _))
 
-(show (then (exec @#e #a1)    #kill))
-(show (then (exec @#0000 #a1) #kill))
-(show (then (exec @#0110 #a1) #kill))
-(show (then (exec @#1110 #a1) #kill))
+(show (exec (exec #e    *#a) *#kill))
+(show (exec (exec #0000 *#a) *#kill))
+(show (exec (exec #0110 *#a) *#kill))
+(show (exec (exec #1110 *#a) *#kill))

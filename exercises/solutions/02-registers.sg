@@ -7,8 +7,10 @@
 ; temporary name: first rename (-old X) (+tmp X), then set
 ; the new value (-tmp X) (+new val).
 ;
-; To duplicate a register into two, use a group of two action
-; stars in a single step so both can interact with the same state.
+; A plain (reactive) step star is consumed by its first use. To
+; duplicate a register, or to update several registers with one
+; star, mark the step as a catalyst (*): catalysts are reusable
+; and are dropped from the result.
 
 (show (then
   ;represents a register with value 0
@@ -19,8 +21,8 @@
   [(-tmp X) (+r0 1)]
 
   ;duplicate the register into two registers r1 and r2
-  { [(-r0 X) (+r1 X)]
-    [(-r0 X) (+r2 X)] }
+  *{ [(-r0 X) (+r1 X)]
+     [(-r0 X) (+r2 X)] }
 
   ;update r1 to 0
   [(-r1 X) (+tmp X)]
@@ -33,13 +35,13 @@
   [(-s2 X) (+r1 X)]
 
   ;duplicate r1 with a copy identifier as first argument
-  { [(-r1 X) (+r1 l X)]
-    [(-r1 X) (+r1 r X)] }
+  *{ [(-r1 X) (+r1 l X)]
+     [(-r1 X) (+r1 r X)] }
 
   ;update all copies of r1 to 5 at once
-  [(-r1 A X) (+tmp A X)]
-  [(-tmp A X) (+r1 A 5)]
+  *[(-r1 A X) (+tmp A X)]
+  *[(-tmp A X) (+r1 A 5)]
 
   ;duplicate each copy of r1 again with the same method
-  { [(-r1 A X) (+r1 l A X)]
-    [(-r1 A X) (+r1 r A X)] }))
+  *{ [(-r1 A X) (+r1 l A X)]
+     [(-r1 A X) (+r1 r A X)] }))

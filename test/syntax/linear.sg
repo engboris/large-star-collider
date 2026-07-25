@@ -6,11 +6,13 @@
 
 (spec nat [(-nat (s X)) (+nat X)])
 
-(def tested @(exec @#1 *#nat))
+; The rule is reactive (unmarked), so it is consumed by its first
+; use: exactly one peeling per execution, however deep the number.
+(def tested (exec #1 #nat))
 (== #tested (+nat 0))
 
-(def tested @(exec @#2 *#nat))
+(def tested (exec #2 #nat))
 (== #tested (+nat (s 0)))
 
-(def tested @(exec @#3 *#nat))
+(def tested (exec #3 #nat))
 (== #tested (+nat (s (s 0))))

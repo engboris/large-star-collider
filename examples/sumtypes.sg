@@ -1,23 +1,21 @@
+; this example is experimental
 (use "milkyway/prelude.sg")
 
-§(spec direction
-  {[-north ok]
-   [-south ok]
-   [-west ok]
-   [-east ok]})
+(spec direction
+  [-north ok]
+  [-south ok]
+  [-west ok]
+  [-east ok])
 
-; n is only ever type-checked, so it lives in the check phase too
-§(def n +north) (:: n direction)
+(object n +north) (::* n direction)
 
-§(spec result
-  {[(-ok X) ok] [(-error X) ok]})
+(spec result
+  [(-ok X) ok] [(-error X) ok])
 
-; x is shared: checked here, consumed by the program below
-(object x (+ok a)) (:: x result)
+(object x (+ok a)) (::* x result)
 
-;pattern matching
-(def get_ok {
+(def get_ok
   [(-ok X) X]
-  [(-error X) (+error X)]})
+  [(-error X) (+error X)])
 
-(show (exec #get_ok @#x))
+(show (exec *#get_ok #x))

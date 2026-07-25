@@ -53,8 +53,8 @@ type trace_state =
 
 and collected_step =
   { step_num : int
-  ; actions : constellation
-  ; states : constellation
+  ; catalysts : constellation
+  ; reactives : constellation
   ; is_final : bool
   }
 
@@ -118,12 +118,12 @@ let print_footer () =
 let make_handler state : Executor.event_handler =
   let open Executor in
   function
-  | StepStart { step; actions; states } -> (
+  | StepStart { step; catalysts; reactives } -> (
     state.fusion_shown_this_step <- false;
     match state.mode with
     | Silent | WebMode ->
       state.collected_steps <-
-        { step_num = step; actions; states; is_final = false }
+        { step_num = step; catalysts; reactives; is_final = false }
         :: state.collected_steps
     | Interactive | Batch -> () (* We'll print on fusion or completion *) )
   | FusionFound candidate -> (
@@ -131,13 +131,21 @@ let make_handler state : Executor.event_handler =
     | Silent | WebMode -> ()
     | (Interactive | Batch) when not state.fusion_shown_this_step ->
       state.fusion_shown_this_step <- true;
-      print_header candidate.state_idx state.location
+      print_header candidate.source_idx state.location
         (Some (magenta "Fusion detected!"));
       Stdlib.Printf.printf "\n";
-      Stdlib.Printf.printf "  State star [%d], ray %d\n" candidate.state_idx
-        candidate.state_ray_idx;
-      Stdlib.Printf.printf "  Action star [%d], ray %d\n" candidate.action_idx
-        candidate.action_ray_idx;
+      Stdlib.Printf.printf "  Reactive star [%d], ray %d\n" candidate.source_idx
+        candidate.source_ray_idx;
+      ( match candidate.partner with
+      | Executor.InternalCut ->
+        Stdlib.Printf.printf "  Internal cut with ray %d\n"
+          candidate.partner_ray_idx
+      | Executor.WithReactive i ->
+        Stdlib.Printf.printf "  Reactive star [%d], ray %d\n" i
+          candidate.partner_ray_idx
+      | Executor.WithCatalyst i ->
+        Stdlib.Printf.printf "  Catalyst star [%d], ray %d\n" i
+          candidate.partner_ray_idx );
       if not (List.is_empty candidate.theta) then
         Stdlib.Printf.printf "  %s %s\n" (dim "θ =")
           (yellow (string_of_subst candidate.theta))
@@ -152,8 +160,8 @@ let make_handler state : Executor.event_handler =
     | Silent | WebMode ->
       state.collected_steps <-
         { step_num = List.length state.collected_steps + 1
-        ; actions = []
-        ; states = result
+        ; catalysts = []
+        ; reactives = result
         ; is_final = true
         }
         :: state.collected_steps
@@ -195,7 +203,7 @@ let format_html state =
       add_line "<div class='step-content'>";
       add_line "<div class='result-label'>Final Result:</div>";
       add_line "<div class='constellation'>";
-      List.iteri step.states ~f:(fun idx star ->
+      List.iteri step.reactives ~f:(fun idx star ->
         add_line
           (Printf.sprintf "<div class='star'>[%d] %s</div>" idx
              (escape_html (string_of_star star)) ) );
@@ -207,11 +215,12 @@ let format_html state =
         (Printf.sprintf "<div class='step-header'>Step %d</div>" step.step_num);
       add_line "<div class='step-content'>";
       add_line "<div class='section'>";
-      add_line "<div class='label'>Actions:</div>";
-      if List.is_empty step.actions then add_line "<div class='empty'>{ }</div>"
+      add_line "<div class='label'>Catalysts:</div>";
+      if List.is_empty step.catalysts then
+        add_line "<div class='empty'>{ }</div>"
       else begin
         add_line "<div class='constellation'>";
-        List.iteri step.actions ~f:(fun idx star ->
+        List.iteri step.catalysts ~f:(fun idx star ->
           add_line
             (Printf.sprintf "<div class='star action-star'>[%d] %s</div>" idx
                (escape_html (string_of_star star)) ) );
@@ -219,11 +228,12 @@ let format_html state =
       end;
       add_line "</div>";
       add_line "<div class='section'>";
-      add_line "<div class='label'>States:</div>";
-      if List.is_empty step.states then add_line "<div class='empty'>{ }</div>"
+      add_line "<div class='label'>Reactive stars:</div>";
+      if List.is_empty step.reactives then
+        add_line "<div class='empty'>{ }</div>"
       else begin
         add_line "<div class='constellation'>";
-        List.iteri step.states ~f:(fun idx star ->
+        List.iteri step.reactives ~f:(fun idx star ->
           add_line
             (Printf.sprintf "<div class='star state-star'>[%d] %s</div>" idx
                (escape_html (string_of_star star)) ) );

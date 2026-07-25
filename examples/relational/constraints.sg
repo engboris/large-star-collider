@@ -7,5 +7,6 @@
 
 (def numbers { [(+num 1)] [(+num 2)] [(+num 3)]})
 
-; every ordered pair of distinct numbers
-(show (exec #numbers @[(-num X) (-num Y) (pair X Y) || (!= X Y)]))
+; every ordered pair of distinct numbers (the facts are a catalyst:
+; each is read twice)
+(show (exec *#numbers [(-num X) (-num Y) (pair X Y) || (!= X Y)]))

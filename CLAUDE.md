@@ -58,25 +58,32 @@ A **constellation** is a group of stars in curly braces:
 
 Constellations are **unordered sets** - the order doesn't matter.
 
-### 6. Focus - States vs Actions (CRITICAL)
+### 6. Reactive Stars and Catalysts (CRITICAL)
 **This is essential for execution to work!**
 
-Stars are divided into two categories:
-- **State stars** (marked with `@`): The data being computed/transformed
-- **Action stars** (no `@`): The rules/program that transforms data
+Every star is one of two things:
+- **Reactive** (unmarked): exists once, consumed the moment it fuses.
+  Reactive stars interact freely, with each other and even with
+  themselves (two dual rays of one star can cancel: an "internal cut").
+  Whatever reactive stars are left when nothing more can react is the
+  result; an untouched reactive star simply stays in the result.
+- **Catalyst** (marked with `*`): reusable (a fresh copy is made every
+  time it is used), passive (it only reacts when a reactive ray comes
+  looking for it), inert toward other catalysts, and dropped from the
+  result once execution ends.
 
 ```stellogen
 {
-  [(+add 0 Y Y)]              ; Action star (rule)
-  @[(-add 2 2 R) R]           ; State star (data/query)
+  *[(+add 0 Y Y)]              ; Catalyst (reusable rule)
+  [(-add 2 2 R) R]             ; Reactive (the query, part of the result)
 }
 ```
 
 **Intuition**:
-- `@` marks what you're **computing** (targets for interaction)
-- No `@` means **how** you compute (rules that can be reused)
+- No mark means **what you're computing**: the data/query, consumed as it reacts
+- `*` means **how you compute**: rules and facts, looked up as needed and never consumed
 
-You can focus entire constellations: `@{...}` focuses all stars inside.
+You can mark an entire constellation a catalyst: `*{...}` makes every star inside one.
 
 ### 7. Star Fusion - How Execution Works
 **Fusion** = stars colliding along compatible rays and merging
@@ -99,39 +106,62 @@ Result: [a]  ; The merged star
 
 This is **Robinson's resolution** from formal logic!
 
-### 8. Execution - exec and the `*` (linear) modality
+### 8. Execution - exec, reactive stars, and catalysts
 **Execution** = stars interacting through fusion until no more interactions possible
 
 ```stellogen
 (def x [(+f X) X])
-(def y [(-f a)])
+(def y (-f a))
 
-(exec @#x #y)    ; y can be reused: non-linear
-(exec @#x *#y)   ; y is consumable: used at most once
+(exec #x #y)    ; both reactive: consumed by their fusion
+(exec #x *#y)   ; y is a catalyst: reusable, dropped from the result
 ```
 
 **Execution process**:
-1. Actions (non-`@` stars) are **duplicated** as needed, unless marked `*`
-2. They **fuse** with state stars (`@`)
-3. Continue until **saturation** (no more possible interactions)
-4. Result is a new constellation
+1. A reactive ray may fuse with any dual, unifiable, eligible ray:
+   another reactive star, a catalyst, or (an **internal cut**) a dual ray
+   of its own star
+2. Catalysts are **duplicated** as needed (never with each other) and
+   dropped from the result; reactive stars are consumed when they react
+   and simply remain in the result when they never get the chance
+   (no weakening)
+3. If a ray has several possible partners, execution branches: it fuses
+   with all of them at once, producing one new star per partner
+4. Continue until **saturation** (no more possible interactions)
+5. Result is a new, all-reactive constellation
 
-**`@` vs `*`** - two independent, composable modalities on a star:
-- `@` (focus): State vs Action - what's being computed vs the rule computing it
-- `*` (linear): reusable (default) vs consumable - a `*`-marked action is
-  removed from the pool after its first use, so it fires at most once. It
-  only affects action stars; `*` on a state star is legal but has no
-  effect, since a state's rays are already consumed as they fuse.
-- Both work on a whole constellation at once, the same way: `@{...}`
-  focuses every star inside, `*{...}` makes every star inside consumable.
+**Termination**: every fusion consumes two rays from a fixed pool, so a
+constellation with no catalysts always terminates. Divergence needs a
+catalyst that keeps feeding a computation fresh copies of itself, like a
+recursive rule set marked `*` chased by a query.
 
-### 9. Then - Staged Execution
+### 9. Ground Guards
+A variable occurrence written `!X` instead of `X` is a **ground guard**:
+the ray it belongs to cannot take part in any fusion until that position
+is fully instantiated (no variables left). The guard survives
+substitution by inheritance (`!X` under `X := (s Y)` becomes `(s !Y)`),
+and once the guarded position is ground the guard is silently discharged.
+
+```stellogen
+; (-table !X R) will not try to interact until X is a value
+(def guarded (exec
+  {[(-val X) (-table !X R) (out R)]
+   [(+val 5)]}
+  *[(+table 5 found)]))
+(show #guarded)  ; (out found)
+```
+
+Use this when a ray should behave like a function waiting for its
+argument rather than a relation that could run backwards, for example a
+circuit gate that should only fire once its inputs are known
+(`examples/circuits.sg`).
+
+### 10. Then - Staged Execution
 `(then c1 c2 ...)` is a **built-in**: execute `c1`, feed the result
-as state to `c2`, and so on - useful for building pipelines.
-It is a left fold over execution: `(then a b)` = `(exec b @a)`. Only
-the intermediate accumulator is refocused between steps; the final
-result comes back bare, just like any other `exec` result - reusable
-later either as state (with an explicit `@`) or as an action.
+directly to `c2`, and so on - useful for building pipelines.
+It is a left fold over execution: `(then a b)` = `(exec b a)`. No
+refocusing happens between steps, because there is no focus anymore: an
+`exec` result is already reactive, so it feeds the next stage as is.
 No import needed:
 ```stellogen
 (def c (then
@@ -143,13 +173,14 @@ No import needed:
 `then` is only special as the head of an expression; it remains usable as
 an ordinary symbol inside terms (e.g. `#(if read 0 on q0 then q1)`).
 
-### 10. Phase Separation - check vs run (§ and object)
+### 11. Phase Separation - check vs run (§ and object)
 A file is two superposed programs. Every top-level expression belongs to
 exactly one of three kinds:
 
 | kind | `sgen check` (phase 1) | `sgen run` (phase 2) |
 |---|---|---|
 | `(object x ...)` shared definition | visible | visible |
+| `(spec x ...)` specification | evaluated | skipped |
 | `§X` where X is any expression | evaluated | skipped |
 | unmarked expression | skipped | evaluated |
 
@@ -159,7 +190,11 @@ exactly one of three kinds:
 - `object` is a keyword (not a sigil): a definition shared by both
   phases - the only thing crossing the boundary. `§(object ...)` is an
   error.
-- `def`/`spec` are phase-neutral; the phase comes solely from `§`.
+- `spec` is check-only by nature: a specification is a test suite/type,
+  so a top-level `(spec ...)` lands in the check phase on its own. `§`
+  is therefore redundant on it (`§(spec ...)` still works but the marker
+  does nothing).
+- `def` is phase-neutral; its phase comes solely from `§`.
   Each phase resolves `#name` calls against its own definitions plus the
   shared objects; referencing a name defined in the other phase is an
   error with a phase-aware message.
@@ -171,17 +206,17 @@ exactly one of three kinds:
   definitions meant to be visible must be `object`s). Macros are
   phase-less (expanded before phases exist); `§(macro ...)` is an error.
 
-### 11. Key Operators
+### 12. Key Operators
 - **Definition**: `(def name value)` - bind name to value
-- **Spec**: `(spec name value)` - built-in synonym of `def` (marks intent: the thing defined is a test suite/type)
+- **Spec**: `(spec name value)` - like `def` but check-phase only (marks intent: the thing defined is a test suite/type; no `§` needed)
 - **Object**: `(object name value)` - definition shared by both phases (see above)
 - **Static marker**: `§expr` - put a top-level expression in the check phase
 - **Call**: `#name` - retrieve definition
-- **Focus**: `@expr` - mark as state/evaluate
-- **Linear**: `*expr` - mark as consumable (used at most once during execution)
+- **Catalyst**: `*expr` - mark as reusable, passive, dropped from the result
+- **Ground guard**: `!X` - a variable occurrence that blocks its ray from fusing until that position is ground
 - **Show**: `(show expr)` - display result
-- **Expect**: `(== expr1 expr2)` - assert syntactic equality
-- **Match**: `(~= r1 r2)` - check structural unifiability; polarity is IGNORED (e.g. `(~= (+f X) (+f a))` succeeds)
+- **Expect**: `(== expr1 expr2)` - assert syntactic equality (ignores the reactive/catalyst mark, not guards)
+- **Match**: `(~= r1 r2)` - check structural unifiability; polarity AND ground guards are IGNORED (e.g. `(~= (+f X) (+f a))` succeeds)
 - **Forall**: `(forall Galaxy X body)` - evaluate `body` once per member of a galaxy, binding each to `X` (used to run every test of a type)
 - **Then**: `(then c1 c2 ...)` - staged execution (built-in, see above)
 - **Macro**: `(macro pattern expansion)` - syntactic preprocessing; **fixed arity only** (no `...` variadic patterns; a name may have several patterns of different arities)
@@ -197,24 +232,26 @@ exactly one of three kinds:
 - **Brackets are resolved by position**: `[...]` at constellation level is a **star**; `[...]` inside a term is a **list**
 - **Groups**: `{...}` for constellations
 - **Stacking**: there is NO `<f a b>` angle-bracket sugar and NO `stack` macro; write nested terms directly: `(s (s 0))`
-- **Staged execution**: `(then c1 c2 ...)` — a built-in, see above
-- **Linear**: `*expr` marks a star (or, as `*{...}`, every star of a constellation) consumable — used at most once per execution
+- **Staged execution**: `(then c1 c2 ...)`, a built-in, see above
+- **Catalyst**: `*expr` marks a star (or, as `*{...}`, every star of a constellation) a catalyst: reusable, passive, dropped from the result
+- **Ground guard**: `!X` marks a variable occurrence: the enclosing ray waits until that position is ground
 
 ### Declarations
 - **Definition**: `(def name value)`
 - **Shared definition**: `(object name value)` - visible in both phases
+- **Specification**: `(spec name value)` - check-phase-only definition (no `§` needed)
 - **Check-phase item**: `§expr` - any top-level expression
 - **Macro**: `(macro (pattern) (expansion))`
 - **Show**: `(show expr)` - display result
 - **Expect**: `(== expr1 expr2)` - assertion/testing (checks equality)
-- **Match**: `(~= c1 c2)` - checks unifiability of constellations (polarity-blind)
+- **Match**: `(~= c1 c2)` - checks unifiability of constellations (polarity-blind and guard-blind)
 
 ### Syntax Reference
 **See `examples/syntax.sg`** for comprehensive examples of all syntactic features including:
 - Rays, stars, and constellations
-- Focus (`@`) and identifiers (`#`)
+- Reactive stars (default) vs catalysts (`*`), and identifiers (`#`)
+- Ground guards (`!X`)
 - String literals and cons lists
-- Linear (`*`) vs non-linear (default) execution
 - Inequality constraints (`|| (!= X Y)`)
 - Staged execution with `then` (built-in)
 - Fields and field access
@@ -238,8 +275,9 @@ Simple version (type = ONE test constellation):
   [(-nat (s N)) (+nat N)]})    ; Recursive: (s N) is nat if N is nat
 
 ; Macro for type checking: success = residue is exactly `ok`
+; Tested is reactive, Test a catalyst (it is consulted, not consumed)
 (macro (:: Tested Test)
-  (== @(exec @#Tested #Test) ok))
+  (== (exec #Tested *#Test) ok))
 
 ; Use the type
 (def two (+nat (s (s 0))))
@@ -253,47 +291,49 @@ The `§` in the expansion sends every call site to the check phase:
 ```stellogen
 (macro (:: Tested Test)
   §(forall Test T
-    (== @(exec @#Tested #T) ok)))
+    (== (exec #Tested *#T) ok)))
 ```
 
 The success convention is deliberately user-defined: different practices
-judge differently (e.g. `examples/proofnets/mll.sg` defines `::lin` using
-`*{...}` to mark both sides consumable, instead of plain `exec`). The
-fixed, trusted part is only the base observations `==`/`~=`; every
-checking macro must bottom out in them.
+judge differently (e.g. `examples/proofnets/mll.sg` defines `::lin` with
+plain markless `exec`, so both sides must be exactly consumed, instead
+of putting the test under `*`). The fixed, trusted part is only the base
+observations `==`/`~=`; every checking macro must bottom out in them.
 
 ### Common Patterns for Writing Stellogen
 
 #### Pattern 1: Relational/Logic Programming (saturation-style, NOT Prolog)
 ```stellogen
-; Facts (positive rays)
-(def facts {
+; Facts (positive rays), as catalysts: looked up, never consumed
+(def facts *{
   [(+parent tom bob)]
   [(+parent bob ann)]})
 
-; Rule: POSITIVE head (conclusion), NEGATIVE premises
-(def rules {
+; Rule: POSITIVE head (conclusion), NEGATIVE premises, also a catalyst
+(def rules *{
   [(+grandparent X Z) (-parent X Y) (-parent Y Z)]})
 
-; Query (negative ray with focus)
-(show (exec { #facts #rules } @[(-grandparent tom Z) (result Z)]))
+; Query (negative ray, reactive by default)
+(show (exec { #facts #rules } [(-grandparent tom Z) (result Z)]))
 ; => (result ann)
 ```
 
 **Key**: Facts are `+`; rule heads are `+` and rule premises are `-`;
-queries are `-` with `@`. A rule head must be positive so the negative
-query can fuse with it — a rule written with a negative head can never
-answer a negative query.
+the query is `-` and reactive. A rule head must be positive so the
+negative query can fuse with it: a rule written with a negative head
+can never answer a negative query. Facts and rules are marked `*`
+(catalysts) so the query can consult them without consuming them and any
+untouched fact does not linger in the result.
 
 **Warning**: putting a positive premise in a rule (e.g.
 `[(+grandparent X Z) (-parent X Y) (+parent Y Z)]`) lets rule copies feed
-each other and typically **diverges** under `exec`. Keep exactly one
-positive ray (the conclusion) per rule.
+each other and typically **diverges** under `exec` once the rule is a
+catalyst. Keep exactly one positive ray (the conclusion) per rule.
 
-Simple joins don't need a rule at all — put several negative rays in the
+Simple joins don't need a rule at all: put several negative rays in the
 query star:
 ```stellogen
-(show (exec #facts @[(-parent tom Y) (-parent Y Z) (grandchild Z)]))
+(show (exec #facts [(-parent tom Y) (-parent Y Z) (grandchild Z)]))
 ; => (grandchild ann)
 ```
 
@@ -303,46 +343,50 @@ branches leave stuck residue stars instead of silently backtracking.
 
 #### Pattern 2: Database Queries
 ```stellogen
-; Database (facts)
-(def employees {
+; Database (facts), as a catalyst
+(def employees *{
   [(+employee alice engineering)]
   [(+employee bob sales)]})
 
-; Query constellation (focused state)
+; Query constellation (reactive by default)
 (def query {
-  @[(-employee Name engineering) (result Name)]})
+  [(-employee Name engineering) (result Name)]})
 
 ; Execute
 (show (exec #query #employees))
 ```
 
-**Key**: Query stars must be `@`-focused to be targets
+**Key**: Mark the database `*` (catalyst) so the query can look facts up
+without consuming them and any fact it doesn't touch stays out of the
+result.
 
 #### Pattern 3: Recursive Computation
 ```stellogen
-; Addition on natural numbers
-(def add {
+; Addition on natural numbers, as a catalyst since the rule recurses
+(def add *{
   [(+add 0 Y Y)]                           ; Base case
   [(-add X Y Z) (+add (s X) Y (s Z))]})    ; Recursive case
 
 ; Query
-(def query @[(-add (s (s 0)) (s (s 0)) R) R])
+(def query [(-add (s (s 0)) (s (s 0)) R) R])
 
 (show (exec #add #query))
 ```
 
-**Key**: Mix positive base cases with negative-to-positive recursive rules
+**Key**: Mix positive base cases with negative-to-positive recursive
+rules, and mark the rule set `*` so each recursive step can reuse it.
 
 #### Pattern 4: Using then for Pipelines
 ```stellogen
 (def c (then                ; then is a built-in, no import needed
-  (+n0 0)                 ; base constellation (becomes the state)
+  (+n0 0)                 ; base constellation
   [(-n0 X) (+n1 (s X))]   ; step 1: consumes the previous result
   [(-n1 X) (+n2 (s X))])) ; step 2: consumes step 1's result
 (show #c)                 ; => (+n2 (s (s 0)))
 ```
-Each step is executed with the accumulated result focused as state:
-`(then A B)` desugars to `@(exec B @A)`, chained left-associatively.
+Each step is executed against the accumulated result of the previous
+ones: `(then A B)` desugars to `(exec B A)`, chained left-associatively,
+with no refocusing (an `exec` result is already reactive).
 
 #### Pattern 5: Inequality Constraints
 ```stellogen
@@ -350,7 +394,7 @@ Each step is executed with the accumulated result focused as state:
 (def data {
   [(+item a)]
   [(+item b)]
-  @[(-item X) (-item Y) (pair X Y) || (!= X Y)]})
+  [(-item X) (-item Y) (pair X Y) || (!= X Y)]})
 
 (show (exec #data))
 ```
@@ -441,7 +485,7 @@ dune build
 dune exec sgen run -- <inputfile>
 
 # Other subcommands
-sgen check <file>        # evaluate the check phase (objects + § items)
+sgen check <file>        # evaluate the check phase (objects + specs + § items)
 sgen preprocess <file>   # show code after macro expansion
 sgen trace <file>        # run with interactive execution trace
 
@@ -454,8 +498,8 @@ sgen --help
 ```
 
 **Tip**: when running with a timeout (programs can diverge), invoke the
-built binary directly — `timeout -s KILL 10 ./_build/default/bin/sgen.exe
-run file.sg` — because `dune exec` wraps the process and defeats `timeout`.
+built binary directly: `timeout -s KILL 10 ./_build/default/bin/sgen.exe
+run file.sg`, because `dune exec` wraps the process and defeats `timeout`.
 
 ## File Extensions
 - `.sg` - Stellogen source files
@@ -463,7 +507,7 @@ run file.sg` — because `dune exec` wraps the process and defeats `timeout`.
 ## Example: Natural Number Addition
 
 ```stellogen
-; Define addition constellation
+; Define addition constellation (a catalyst: the recursive rule is reused)
 (def add {
   [(+add 0 Y Y)]
   [(-add X Y Z) (+add (s X) Y (s Z))]})
@@ -472,26 +516,27 @@ run file.sg` — because `dune exec` wraps the process and defeats `timeout`.
 (def query [(-add (s (s 0)) (s (s 0)) R) R])
 
 ; Execute interaction
-(show (exec #add @#query))   ; => (s (s (s (s 0))))
+(show (exec *#add #query))   ; => (s (s (s (s 0))))
 ```
 
 ## Example: Type Definition
 
 ```stellogen
-; spec is a built-in synonym of def (marks intent)
+; spec binds like def but lands in the check phase on its own (no § needed)
 
-; Macro for type assertion; the § sends call sites to the check phase
+; Macro for type assertion; the § sends call sites to the check phase.
+; Tested is reactive, Test a catalyst: it is consulted, not consumed
 (macro (:: Tested Test)
-  §(== @(exec @#Tested #Test) ok))
+  §(== (exec #Tested *#Test) ok))
 
-; Define nat type as interactive tests (check phase)
-§(spec nat {
+; Define nat type as interactive tests (check phase, thanks to spec)
+(spec nat {
   [(-nat 0) ok]
   [(-nat (s N)) (+nat N)]})
 
 ; Define and check a value used by both phases
-(object 0 (+nat 0))
-(:: 0 nat)  ; verified by sgen check, skipped by sgen run
+(object zero (+nat 0))
+(:: zero nat)  ; verified by sgen check, skipped by sgen run
 ```
 
 ## Dependencies (OCaml)
@@ -561,22 +606,28 @@ dune test
 - **Polarity** drives interaction - positive/negative rays fuse
 - **Constellations** are the core computational unit
 - **Stars** are blocks of rays that can fuse
-- **Focus (`@`)** is CRITICAL - marks state stars vs action stars
+- **Reactive vs catalyst (`*`)** is CRITICAL - what's being computed vs the reusable rules computing it
 - Variables are **local to each star** - not shared between stars
 - The evaluator orchestrates term interactions, not traditional evaluation
-- Actions are **duplicated** during execution; states are **transformed**
+- Catalysts are **duplicated** during execution and dropped from the result;
+  reactive stars are **consumed** when they react, or **kept as is** when they never get the chance (no weakening)
 
 ### Common Mistakes When Writing Stellogen
 
-❌ **Mistake 1**: Forgetting `@` on query/state stars
+❌ **Mistake 1**: Forgetting `*` on rules/facts that need to be reused
 ```stellogen
-; WRONG - query has no @
-(def query [(-employee Name Dept)])
-(exec #query #employees)  ; Returns {} - no state to interact with!
+; WRONG - add is reactive, so it is consumed after one recursive step
+(def add {
+  [(+add 0 Y Y)]
+  [(-add X Y Z) (+add (s X) Y (s Z))]})
+(def query [(-add (s (s 0)) (s (s 0)) R) R])
+(exec #add #query)  ; Gets stuck: leftover query and partial rule, not a number
 
-; CORRECT - query is focused
-(def query @[(-employee Name Dept)])
-(exec #query #employees)  ; Works!
+; CORRECT - mark add a catalyst so each recursive step can reuse it
+(def add *{
+  [(+add 0 Y Y)]
+  [(-add X Y Z) (+add (s X) Y (s Z))]})
+(exec #add #query)  ; => (s (s (s (s 0))))
 ```
 
 ❌ **Mistake 2**: Thinking variables are shared between stars
@@ -604,7 +655,7 @@ dune test
 ; CORRECT - provider (+) and requester (-)
 {
   [(+data X)]     ; Provides
-  @[(-data X)]    ; Requests
+  [(-data X)]     ; Requests
 }
 ```
 
@@ -613,12 +664,12 @@ dune test
 ; Stellogen is NOT clause-based!
 ; Constellations are UNORDERED sets of stars
 ; Order doesn't determine execution flow
-; Use polarity and focus instead
+; Use polarity and the reactive/catalyst mark instead
 ```
 
 ### Debugging tips:
-- **Empty `{}`** result? Check if query stars have `@` focus
-- **No interaction happening?** Verify polarity: need `+` and `-` to match
+- **Stuck or cluttered result?** Check whether a rule or fact that should be reused is missing its `*`
+- **No interaction happening?** Verify polarity: need `+` and `-` to match, and check any `!X` guard is actually ground
 - **Variables not binding?** Remember: variables are local to each star
 - Use `(show ...)` to inspect intermediate results
 - Examine `examples/*.sg` for canonical usage patterns
@@ -654,30 +705,32 @@ a bob 0         ; Constants
 (f X)           ; Neutral (no interaction)
 
 ; Stars and Constellations
-[ray1 ray2]     ; Star (block of rays)
+[ray1 ray2]     ; Star (block of rays), reactive by default
 { star1 star2 } ; Constellation (group of stars)
-@[...]          ; Focused star (state)
-*[...]          ; Linear star (consumable, used at most once)
+*[...]          ; Catalyst star (reusable, dropped from the result)
+!X              ; Ground guard: the ray waits until X is ground
 [(+f X) || (!= X Y)]  ; Star with inequality constraint
 
 ; Definitions and Calls
 (def name value) ; Define (in the phase of the enclosing item)
 (object name value) ; Define shared between check and run phases
+(spec name value) ; Define in the check phase only (no § needed)
 #name           ; Call/reference
-@#name          ; Call and focus
+*#name          ; Call and mark a catalyst
 
 ; Phases
 §expr           ; Any top-level expression: check phase (sgen check)
                 ; Unmarked top-level expressions: run phase (sgen run)
+                ; (spec ...) is check-phase on its own
 
 ; Execution
-(exec c1 c2)    ; c2's non-linear stars can be reused; *-marked ones fire once
-(then c1 c2)    ; Staged execution (built-in): (exec c2 @c1)
+(exec c1 c2)    ; c1 and c2's reactive stars react freely; *-marked ones are catalysts
+(then c1 c2)    ; Staged execution (built-in): (exec c2 c1), no refocusing
 
 ; Utilities
 (show expr)     ; Display result
-(== e1 e2)      ; Assert equality
-(~= r1 r2)      ; Check unifiability (ignores polarity)
+(== e1 e2)      ; Assert equality (ignores the reactive/catalyst mark)
+(~= r1 r2)      ; Check unifiability (ignores polarity and guards)
 (forall G X e)  ; Evaluate e for each member of galaxy G bound to X
 
 ; Imports
@@ -695,30 +748,31 @@ a bob 0         ; Constants
 
 ### Mental Model
 ```
-FACTS (data)     = Positive rays (+)
-QUERIES (goals)  = Negative rays (-) with @focus
-RULES            = Stars with a POSITIVE head (conclusion)
-                   and NEGATIVE premises
-EXECUTION        = Saturation via star fusion
+FACTS (data)     = Positive rays (+), usually catalysts (*)
+QUERIES (goals)  = Negative rays (-), reactive (the default)
+RULES            = Stars with a POSITIVE head (conclusion) and
+                   NEGATIVE premises, usually catalysts (*) too
+EXECUTION        = Saturation via star fusion (reactive/reactive,
+                   reactive/catalyst, or a star with itself)
 ```
 
 ### Typical Program Structure
 ```stellogen
-; 1. Define facts/data (positive)
-(def facts {
+; 1. Define facts/data (positive), as a catalyst
+(def facts *{
   [(+parent tom bob)]
   [(+parent bob ann)]})
 
-; 2. Define rules (positive conclusion, negative premises)
-(def rules {
+; 2. Define rules (positive conclusion, negative premises), also a catalyst
+(def rules *{
   [(+grandparent X Z) (-parent X Y) (-parent Y Z)]})
 
-; 3. Execute against a focused query (negative)
-(show (exec { #facts #rules } @[(-grandparent tom Z) (result Z)]))
+; 3. Execute against a reactive query (negative)
+(show (exec { #facts #rules } [(-grandparent tom Z) (result Z)]))
 ; => (result ann)
 ```
 
 ---
 
-*Last updated: 2026-07-13 — all code examples in this file are verified to run against the current implementation.*
-*For current implementation details, always refer to `BASICS.md`, the wiki, and source code as the language evolves rapidly.*
+*Last updated: 2026-07-15. All code examples in this file are verified to run against the current implementation.*
+*For current implementation details, always refer to `BASICS.md`, `KERNEL.md`, the wiki, and source code as the language evolves rapidly.*
