@@ -1,36 +1,31 @@
-; The cut linking function to argument carries one exchange per
-; address shape, so it is written split address-wise: one reactive
-; star per address. The whole net is markless and normalizes by
-; internal reactions.
+; The general case follows the exemple linear_lambda.sg except that
+; there is an additional variable Y used to represent a "copy
+; identifier" for duplication (contraction).
 
-; id id
-(def id [(+id (exp [l|X] d)) (+id [r|X])])
+; variable x (as argument)
+; the 'Y' variable holds the non-linear potential
+(object var_x [(x (exp X d)) (+arg (exp [l|X] Y))])
 
-(def id_arg [(ida (exp [l|X] Y)) (+arg (exp [l r|X] Y))])
+; identity function id = \x -> x
+; the non-linear potential is suppressed with 'd' corresponding
+; to Girard's dereliction
+(object id [(+id (exp [l|X] d)) (+id [r|X])])
 
-(def linker {
-  [(-id (exp X Y)) (-arg (exp X Y))]
-  [(-id [r|X]) (-arg [r|X])]
-  [(+arg [r|X]) (out X)]})
-
-(show (exec #id #id_arg #linker))
-
-; id x
-(def var_x [(x (exp X Y)) (+arg (exp [l|X] Y))])
-
-(def linker {
-  [(-id (exp X Y)) (-arg (exp X Y))]
-  [(-id [r|X]) (-arg [r|X])]
-  [(+arg [r|X]) (out X)]})
-
-(show (exec #id #var_x #linker))
-
-; lproj x
-(def lproj {
-  [(+lproj [l|X])] ;weakening
+; left projection lproj = \x y -> x discarding its second argument
+(object lproj {
+  [(+lproj [l|X] w)] ; weakening
   [(lproj (exp [r l|X] d)) (+lproj [r r|X])]})
 
-(def linker {
-  [(-lproj [l|X]) (-arg [l|X])]
-  [(-lproj [r|X]) (-arg [r|X])]
-  [(+arg [r|X]) (out X)]})
+(object cut [(-lproj X) (-arg X)])  ; cut
+(object out [(+arg [r|X]) (out X)]) ; output
+
+; application (lproj x)
+(show (exec *#lproj *#var_x *#cut @#out))
+
+; duplicator omega = \x -> x x
+(object omega
+  [(+x (exp X [l|Y])) (+xout X)]            ; var x as function
+  [(+x (exp X [r|Y])) (+arg (exp [l|X] Y))] ; var x as argument
+  [(+arg [r|X]) (out X)] ; output
+  [(-xout X) (-arg X)] ; cut
+)

@@ -15,10 +15,10 @@
 (def two_hop {
   [(+two_hop X Z) (-link X Y) (-link Y Z)]})
 
-(def knowledge { #link #two_hop })
+(def rules #link #two_hop)
 
 ; direct links from b
 (show (exec *#link [(-link b Y) Y]))
 
 ; who is two hops away from a?
-(show (exec *#knowledge [(-two_hop a Z) Z]))
+(show (exec *#rules [(-two_hop a Z) Z]))

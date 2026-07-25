@@ -7,4 +7,8 @@
 ; check-phase item, evaluated by 'sgen check' and skipped by 'sgen run'.
 (macro (:: Tested Test)
   §(forall Test T
+    (== (exec #Tested #T) ok)))
+
+(macro (::* Tested Test)
+  §(forall Test T
     (== (exec #Tested *#T) ok)))

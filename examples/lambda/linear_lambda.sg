@@ -1,44 +1,46 @@
+; It is possible to represent lambda terms by using their translation to
+; proof-structures:
+; - a free variable is an axiom;
+; - an abstraction is a 'par' connecting a free variable;
+; - an application connects a body and a tensor argument+output with a cut.
 (use "../milkyway/prelude.sg")
 
-; identity function (\x -> x)
-(def id [(+id [l|X]) (+id [r|X])])
+; variable x
+(object x_arg [(x X) (+arg [l X])])
 
-; id id
-(def id_arg [(ida [l|X]) (+arg [l r|X])])
+; linear identity function id = \x -> x
+(object id [(+id [l|X]) (+id [r|X])])
 
-; the cut linking function to argument carries two addresses, so it
-; is written split address-wise: one reactive star per address
-(def linker {
-  [(-id [l|X]) (-arg [l|X])]
-  [(-id [r|X]) (-arg [r|X])]
-  [(+arg [r|X]) (out X)]})
+(object cut [(-id X) (-arg X)]) ; cut
+(object out [(+arg [r|X]) (out X)]) ; output
 
-(show (exec #id #id_arg #linker))
+; application (id x)
+(show (exec *#id *#x_arg *#cut @#out))
 
-; id x
-(def x_arg [(x X) (+arg [l X])])
+; identity function as argument
+(object id_arg [(ida [l|X]) (+arg [l r|X])])
 
-(def linker {
-  [(-id [l|X]) (-arg [l|X])]
-  [(-id [r|X]) (-arg [r|X])]
-  [(+arg [r|X]) (out X)]})
+(object cut [(-id X) (-arg X)]) ; cut
+(object [(+arg [r|X]) (out X)]) ; output
 
-(show (exec #id #x_arg #linker))
+; application (id id)
+(show (exec *#id *#id_arg *#cut @#out))
 
-; linear types (check phase)
-§(spec (larrow a a)
-  {[+test1 [
-    [(-x X) (+parxy X)]
-    [(-y X)]
-    [(-parxy X) ok]]]}
-  {[+test2 [
-    [(-x X)]
-    [(-y X) (+parxy X)]
-    [(-parxy X) ok]]]})
+; linear application type
+(spec (lollipop A B)
+  ; switching left
+  { [(- (var A) X) (+parxy X)]
+    [(- (var B) X)]
+    [(-parxy X) ok]}
+  ; switching right
+  { [(- (var A) X)]
+    [(- (var B) X) (+parxy X)]
+    [(-parxy X) ok]})
 
-(def adapter {
-  [(-id [l|X]) (+x X)]
-  [(-id [r|X]) (+y X)]})
+(object adapter
+  [(-id [l|X]) (+ (var x) X)]
+  [(-id [r|X]) (+ (var y) X)])
 
-(def vehicle { #id #adapter })
-;TODO (:: vehicle (larrow a a))
+; Testing type of 'id'
+(object vehicle (exec #id #adapter))
+(:: vehicle (lollipop x y))

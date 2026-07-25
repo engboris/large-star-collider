@@ -19,35 +19,35 @@
 (def sub {
   [(+sub Y 0 Y)]
   [(-sub X Y Z) (+sub (s X) (s Y) Z)]})
-(def knowledge { #add #sub })
+(def rules #add #sub)
 
 ; UNARY ADDITION
 
 (def (add_query X Y R)
-  [(-add X Y R) (result of X + Y = R)])
+  [(-add X Y R) (result X + Y = R)])
 
 ; Query: 0 + 0 = ?
-(show (exec *#knowledge #(add_query 0 0 R)))
+(show (exec *#rules #(add_query 0 0 R)))
 
 ; Query: 0 + 4 = ?
-(show (exec *#knowledge #(add_query 0 (s (s (s (s 0)))) R)))
+(show (exec *#rules #(add_query 0 (s (s (s (s 0)))) R)))
 
 ; Query: 2 + 2 = ?
-(show (exec *#knowledge #(add_query (s (s 0)) (s (s 0)) R)))
+(show (exec *#rules #(add_query (s (s 0)) (s (s 0)) R)))
 
 ; Query: 2 + ? = 4
-(show (exec *#knowledge #(add_query (s (s 0)) R (s (s (s (s 0)))))))
+(show (exec *#rules #(add_query (s (s 0)) R (s (s (s (s 0)))))))
 
 ; UNARY SUBSTRACTION
 
 (def (sub_query X Y R)
-  [(-sub X Y R) (result of X - Y = R)])
+  [(-sub X Y R) (result X - Y = R)])
 
 ; Query: 0 - 0 = ?
-(show (exec *#knowledge #(sub_query 0 0 R)))
+(show (exec *#rules #(sub_query 0 0 R)))
 
 ; Query: 4 - 2 = ?
-(show (exec *#knowledge #(sub_query (s (s (s (s 0)))) (s (s 0)) R)))
+(show (exec *#rules #(sub_query (s (s (s (s 0)))) (s (s 0)) R)))
 
 ; Query: ? - 2 = 2
-(show (exec *#knowledge #(sub_query R (s (s 0)) (s (s 0)))))
+(show (exec *#rules #(sub_query R (s (s 0)) (s (s 0)))))

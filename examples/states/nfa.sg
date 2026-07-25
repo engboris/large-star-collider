@@ -1,23 +1,25 @@
 (use "../milkyway/prelude.sg")
 
-§(spec binary
+; type of words made of 0 and 1
+(spec binary
   {[(-i []) ok]
    [(-i [0|X]) (+i X)]
    [(-i [1|X]) (+i X)]})
 
-;input words, shared between the check and run phases
-(object e (+i []))        (:: e binary)
-(object 0 (+i [0]))       (:: 0 binary)
-(object 000 (+i [0 0 0])) (:: 000 binary)
-(object 010 (+i [0 1 0])) (:: 010 binary)
-(object 110 (+i [1 1 0])) (:: 110 binary)
+; input words
+(object e (+i []))        (::* e binary)
+(object 0 (+i [0]))       (::* 0 binary)
+(object 000 (+i [0 0 0])) (::* 000 binary)
+(object 010 (+i [0 1 0])) (::* 010 binary)
+(object 110 (+i [1 1 0])) (::* 110 binary)
 
+; some macros for readable state machines
 (def (initial Q) [(-i W) (+a W Q)])
 (def (accept Q) [(-a [] Q) accept])
 (def (if read C1 on Q1 then Q2) [(-a [C1|W] Q1) (+a W Q2)])
 
 ; automaton accepting words ending with 00
-(def a1 {
+(def a {
   #(initial q0)
   #(accept q2)
   #(if read 0 on q0 then q0)
@@ -25,11 +27,11 @@
   #(if read 1 on q0 then q0)
   #(if read 0 on q1 then q2)})
 
-; the automaton and the kill step are catalysts: rules fire once
-; per configuration they match, and unused rules are dropped
+; erase leftover of computation that didn't reach
+; the accepting state
 (def kill (-a _ _))
 
-(show (then (exec #e *#a1)   *#kill))
-(show (then (exec #000 *#a1) *#kill))
-(show (then (exec #010 *#a1) *#kill))
-(show (then (exec #110 *#a1) *#kill))
+(show (exec (exec #e   *#a) *#kill))
+(show (exec (exec #000 *#a) *#kill))
+(show (exec (exec #010 *#a) *#kill))
+(show (exec (exec #110 *#a) *#kill))

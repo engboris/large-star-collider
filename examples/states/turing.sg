@@ -47,12 +47,11 @@
 
 (def (word W) (+i W))
 
-(show (exec #(word [a e]) *#mt))
-(show (exec #(word [b e]) *#mt))
-(show (exec #(word [a b b e]) *#mt))
-
-(show (exec #(word [e]) *#mt))
-(show (exec #(word [a b e]) *#mt))
+(show (exec #(word [a e])       *#mt))
+(show (exec #(word [b e])       *#mt))
+(show (exec #(word [a b b e])   *#mt))
+(show (exec #(word [e])         *#mt))
+(show (exec #(word [a b e])     *#mt))
 (show (exec #(word [a a b b e]) *#mt))
 (show (exec #(word [a b b a e]) *#mt))
 (show (exec #(word [a b a b e]) *#mt))

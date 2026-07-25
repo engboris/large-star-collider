@@ -1,3 +1,5 @@
+; This example is experimental
+
 (def left  [(+5 [l l|X]) (+5 [l r|X]) || (slice c a)])
 (def right [(+5 [r l|X]) (+5 [r r|X]) || (slice c b)])
 
@@ -7,13 +9,7 @@
   [(+3 [l l|X]) (c X)]
   [(+3 [l r|X]) (d X)]})
 
-; the cut carries one exchange per address, so it is written split
-; address-wise: one reactive star per address
-(def cut {
-  [(-5 [l l|X]) (-3 [l l|X])]
-  [(-5 [l r|X]) (-3 [l r|X])]
-  [(-5 [r l|X]) (-3 [r l|X])]
-  [(-5 [r r|X]) (-3 [r r|X])]})
+(def cut [(-5 X) (-3 X)])
 
 (show (then
   #with
