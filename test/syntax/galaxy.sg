@@ -31,10 +31,15 @@
 (def val (+check a))
 (== (exec #val *#my-tests) ok)
 
-; --- spec is alias for def ---
+; --- spec binds in the check phase ---
 
 (spec direction
   {[-north ok] [-south ok] [-west ok] [-east ok]})
 
-(def n +north)
-(:: n direction)
+; 'n' is an object so both phases see it; the assertion carries § so it
+; lands in the check phase, where 'direction' is visible. 'sgen run'
+; skips it.
+(object n +north)
+
+§(forall direction Test
+  (== (exec #n *#Test) ok))

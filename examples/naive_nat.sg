@@ -6,10 +6,10 @@
   {[(-nat 0) ok]
    [(-nat (s N)) (+nat N)]})
 
-(object 0 (+nat 0))             (:: 0 nat)
-(object 1 (+nat (s 0)))         (:: 1 nat)
-(object 2 (+nat (s (s 0))))     (:: 2 nat)
-(object 3 (+nat (s (s (s 0))))) (:: 2 nat)
+(object 0 (+nat 0))             (::* 0 nat)
+(object 1 (+nat (s 0)))         (::* 1 nat)
+(object 2 (+nat (s (s 0))))     (::* 2 nat)
+(object 3 (+nat (s (s (s 0))))) (::* 2 nat)
 
 ; successor function adding 1
 (def suc [(-nat X) (+nat (s X))])
