@@ -159,7 +159,7 @@ from not naming them.
   interactive, non-deterministic, possibly non-terminating. This is the
   logic/constraint-programming flavour — the chemistry.
 - **The meta-language: the expression layer.** `def`, `#`-reference,
-  parametric definitions, fixed-arity `macro`, `exec`/`then`,
+  parametric definitions, fixed-arity `macro`, `exec`,
   `show`, `==`, `~=`, `forall`, `use`. Its semantics is a small functional
   evaluator: deterministic, ordered, substitution-based. Its *only* data are
   terms and constellations; its *only* job is to build constellations, run

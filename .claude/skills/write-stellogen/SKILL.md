@@ -19,7 +19,7 @@ You are writing code in **Stellogen**, an experimental language based on **stell
 4. **Constellations are groups of stars** in `{...}`. They are unordered.
 5. **Focus (`@`) is critical.** It marks state stars (data being transformed). Without `@`, nothing executes.
 6. **Actions are reusable by default**; prefix a star with `*` to mark it consumable (used at most once). `*{...}` marks every star in a group consumable.
-7. **`then` chains** constellations sequentially (built-in).
+7. **Nested `exec` chains** constellations sequentially: `(exec c2 (exec c1 base))`.
 8. **Programs have two phases.** `§` before a top-level expression puts it in the check phase (`sgen check`); unmarked expressions form the run phase (`sgen run`); `(object x ...)` definitions are shared between both. Each phase only sees its own definitions plus objects.
 
 ## Writing Process

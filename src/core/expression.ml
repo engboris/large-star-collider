@@ -519,10 +519,9 @@ let rec constellation_of_expr :
 
 (* The parser attaches a real source position to every parsed expr node,
    not just top-level declarations (see the `expr` rule in parser.mly), so
-   [expr.loc] is normally already the right line - e.g. a `then` pipeline
-   (each stage its own nested `exec`) or an inline `exec` reports
-   the line it is actually running, not the location of the whole
-   enclosing form. Synthetic nodes (introduced by macro expansion) can
+   [expr.loc] is normally already the right line - e.g. a nested `exec`
+   reports the line it is actually running, not the location of the
+   whole enclosing form. Synthetic nodes (introduced by macro expansion) can
    still be born with loc = None, so each node falls back to the nearest
    enclosing location this recursion has already resolved. *)
 let rec sgen_expr_of_expr ?(enclosing_loc : source_location option = None)
@@ -561,24 +560,6 @@ let rec sgen_expr_of_expr ?(enclosing_loc : source_location option = None)
       match sgen_exprs with [ single ] -> single | multiple -> Group multiple
     in
     Exec (combined, loc) |> Result.return
-  | List ({ content = Symbol "then"; _ } :: first :: rest) ->
-    (* (then c1 c2 ... cn): staged execution. Left fold where each step
-       executes against the previous result: (then a b) = (exec b a).
-       An exec result is reactive, so it feeds the next stage without
-       any refocusing. Each stage keeps its own location (the line of
-       that stage's expression), not the location of the whole `then`
-       form, so tracing a pipeline shows progress line by line. *)
-    let* first_expr = recur first in
-    let* step_exprs =
-      List.map rest ~f:(fun step ->
-        let* step_expr = recur step in
-        let step_loc = match step.loc with Some _ -> step.loc | None -> loc in
-        Result.return (step_loc, step_expr) )
-      |> Result.all
-    in
-    List.fold_left step_exprs ~init:first_expr ~f:(fun acc (step_loc, step) ->
-      Exec (Group [ step; acc ], step_loc) )
-    |> Result.return
   | List [ { content = Symbol op; _ }; expr1; expr2 ]
     when String.equal op expect_op ->
     let* sgen_expr1 = recur expr1 in

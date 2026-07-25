@@ -11,6 +11,6 @@
 
 (def cut [(-5 X) (-3 X)])
 
-(show (then
-  #with
-  { #plus #cut }))
+(show (exec
+  { #plus #cut }
+  #with))

@@ -24,22 +24,24 @@
   #(if A = 1 then R = 0)
   #(if A = 0 then R = 1))
 
-(def (and X Y) (then #X *#(and1 b1 b2 r) #Y))
+(def (and X Y) (exec #Y (exec *#(and1 b1 b2 r) #X)))
 (show #(and b1 b2))
 (== #(and b1 b2) #(make_bin r 0 0 0 1))
 
-(def (or X Y) (then #b1 *#(or1 b1 b2 r) #b2))
+(def (or X Y) (exec #b2 (exec *#(or1 b1 b2 r) #b1)))
 (show #(or b1 b2))
 (== #(or b1 b2) #(make_bin r 0 0 1 1))
 
-(def (not X) (then #b1 *#(not1 b1 r)))
+(def (not X) (exec *#(not1 b1 r) #b1))
 (show #(not b1))
 (== #(not b1) #(make_bin r 1 1 1 0))
 
-(def (nand X Y) (then #b1 *#(and1 b1 b2 r1) #b2 *#(not1 r1 r2)))
+(def (nand X Y)
+  (exec *#(not1 r1 r2) (exec #b2 (exec *#(and1 b1 b2 r1) #b1))))
 (show #(nand b1 b2))
 (== #(nand b1 b2) #(make_bin r2 1 1 1 0))
 
-(def (xor X Y) (then #(nand b1 b2) *#(and1 r2 r r3) #(or b1 b2)))
+(def (xor X Y)
+  (exec #(or b1 b2) (exec *#(and1 r2 r r3) #(nand b1 b2))))
 (show #(xor b1 b2))
 (== #(xor b1 b2) #(make_bin r3 0 0 1 0))

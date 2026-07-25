@@ -67,15 +67,15 @@ are not re-litigated:
 - **Design:** `ai/research/meta_kernel.md`. An admission rule (a form is
   admitted only if inexpressible by lower strata plus macros;
   observation additions cost the most), a census of the fourteen forms
-  (`then` is kernel debt like `spec`; `~=` earns its seat but its
+  (`spec` is kernel debt; `~=` earns its seat but its
   any-ray-pair existential semantics looks accidental; `forall` is the
   galaxy eliminator whose content is separation of interaction spaces,
   not a quantifier), and the direction: lift the ceiling by reflection
   (Maude META-LEVEL precedent), not by growing the menu or turning the
   glue into a programming language.
 - **Actions (ordered):** decide internal polarities (5.4, gates the
-  encoding contract 2.5.2); sharpen KERNEL.md entries for `~=`/`forall`
-  and note `then` as debt; `quote` (reify execution results into the
+  encoding contract 2.5.2); sharpen KERNEL.md entries for `~=`/`forall`;
+  `quote` (reify execution results into the
   %-encoding; demotes `~=`, dissolves negative assertions, inverts the
   trust trend); fuel axis; `eval` only with
   its first strategy/tactic client and a written trust story.

@@ -156,22 +156,24 @@ argument rather than a relation that could run backwards, for example a
 circuit gate that should only fire once its inputs are known
 (`examples/circuits.sg`).
 
-### 10. Then - Staged Execution
-`(then c1 c2 ...)` is a **built-in**: execute `c1`, feed the result
-directly to `c2`, and so on - useful for building pipelines.
-It is a left fold over execution: `(then a b)` = `(exec b a)`. No
-refocusing happens between steps, because there is no focus anymore: an
-`exec` result is already reactive, so it feeds the next stage as is.
-No import needed:
+### 10. Staged Execution
+Pipelines are just nested `exec`: an `exec` result is already reactive,
+so it feeds the next stage as is (no refocusing).
 ```stellogen
-(def c (then
-  (+n0 0)                 ; base constellation
-  [(-n0 X) (+n1 (s X))]   ; interacts with previous result
-  [(-n1 X) (+n2 (s X))])) ; interacts with previous result
-(show #c)                 ; (+n2 (s (s 0)))
+(def c (exec
+  [(-n1 X) (+n2 (s X))]      ; last stage
+  (exec
+    [(-n0 X) (+n1 (s X))]    ; first stage
+    (+n0 0))))               ; base constellation
+(show #c)                    ; (+n2 (s (s 0)))
 ```
-`then` is only special as the head of an expression; it remains usable as
-an ordinary symbol inside terms (e.g. `#(if read 0 on q0 then q1)`).
+Long pipelines read better as a chain of named steps:
+```stellogen
+(def s0 (+n0 0))
+(def s1 (exec [(-n0 X) (+n1 (s X))] #s0))
+(def s2 (exec [(-n1 X) (+n2 (s X))] #s1))
+(show #s2)                   ; (+n2 (s (s 0)))
+```
 
 ### 11. Phase Separation - check vs run (§ and object)
 A file is two superposed programs. Every top-level expression belongs to
@@ -218,7 +220,6 @@ exactly one of three kinds:
 - **Expect**: `(== expr1 expr2)` - assert syntactic equality (ignores the reactive/catalyst mark, not guards)
 - **Match**: `(~= r1 r2)` - check structural unifiability; polarity AND ground guards are IGNORED (e.g. `(~= (+f X) (+f a))` succeeds)
 - **Forall**: `(forall Galaxy X body)` - evaluate `body` once per member of a galaxy, binding each to `X` (used to run every test of a type)
-- **Then**: `(then c1 c2 ...)` - staged execution (built-in, see above)
 - **Macro**: `(macro pattern expansion)` - syntactic preprocessing; **fixed arity only** (no `...` variadic patterns; a name may have several patterns of different arities)
 - **Import**: `(use "path")` imports both definitions and macros. Relative paths resolve **relative to the importing file**, not the working directory.
 
@@ -232,7 +233,6 @@ exactly one of three kinds:
 - **Brackets are resolved by position**: `[...]` at constellation level is a **star**; `[...]` inside a term is a **list**
 - **Groups**: `{...}` for constellations
 - **Stacking**: there is NO `<f a b>` angle-bracket sugar and NO `stack` macro; write nested terms directly: `(s (s 0))`
-- **Staged execution**: `(then c1 c2 ...)`, a built-in, see above
 - **Catalyst**: `*expr` marks a star (or, as `*{...}`, every star of a constellation) a catalyst: reusable, passive, dropped from the result
 - **Ground guard**: `!X` marks a variable occurrence: the enclosing ray waits until that position is ground
 
@@ -253,7 +253,7 @@ exactly one of three kinds:
 - Ground guards (`!X`)
 - String literals and cons lists
 - Inequality constraints (`|| (!= X Y)`)
-- Staged execution with `then` (built-in)
+- Staged execution with nested `exec`
 - Fields and field access
 - Nested structures
 - File imports with `(use "path")`
@@ -376,17 +376,17 @@ result.
 **Key**: Mix positive base cases with negative-to-positive recursive
 rules, and mark the rule set `*` so each recursive step can reuse it.
 
-#### Pattern 4: Using then for Pipelines
+#### Pattern 4: Pipelines with Nested exec
 ```stellogen
-(def c (then                ; then is a built-in, no import needed
-  (+n0 0)                 ; base constellation
-  [(-n0 X) (+n1 (s X))]   ; step 1: consumes the previous result
-  [(-n1 X) (+n2 (s X))])) ; step 2: consumes step 1's result
-(show #c)                 ; => (+n2 (s (s 0)))
+(def s0 (+n0 0))                            ; base constellation
+(def s1 (exec [(-n0 X) (+n1 (s X))] #s0))   ; step 1: consumes s0
+(def s2 (exec [(-n1 X) (+n2 (s X))] #s1))   ; step 2: consumes s1
+(show #s2)                                  ; => (+n2 (s (s 0)))
 ```
-Each step is executed against the accumulated result of the previous
-ones: `(then A B)` desugars to `(exec B A)`, chained left-associatively,
-with no refocusing (an `exec` result is already reactive).
+Each step is executed against the result of the previous one. Naming the
+steps is only for readability: `(exec c2 (exec c1 base))` says the same
+thing in one expression, with no refocusing between stages (an `exec`
+result is already reactive).
 
 #### Pattern 5: Inequality Constraints
 ```stellogen
@@ -441,7 +441,6 @@ stellogen/
 │   ├── proofnets/               # MLL proof nets (correctness as tests)
 │   ├── states/                  # State machine examples
 │   └── ...
-├── exercises/                # Learning exercises (with solutions/)
 ├── ai/                       # AI-assisted research notes (strategy docs)
 ├── BASICS.md                 # Fundamental mechanics reference
 ├── web/                      # Web playground
@@ -725,7 +724,7 @@ a bob 0         ; Constants
 
 ; Execution
 (exec c1 c2)    ; c1 and c2's reactive stars react freely; *-marked ones are catalysts
-(then c1 c2)    ; Staged execution (built-in): (exec c2 c1), no refocusing
+                ; Staged execution: nest them, (exec c2 (exec c1 base))
 
 ; Utilities
 (show expr)     ; Display result

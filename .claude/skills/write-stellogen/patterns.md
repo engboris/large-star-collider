@@ -31,7 +31,7 @@ a bob 0            ; Constants (lowercase/digits)
 ; Execution
 (exec actions @states)    ; actions reusable by default
 (exec *actions @states)   ; * marks actions consumable (used at most once)
-(then c1 c2 c3)           ; Chain: exec c2 on c1, then c3 on result (built-in)
+(exec c3 (exec c2 c1))    ; Chain: exec c2 on c1, then c3 on the result
 
 ; Testing & display
 (show expr)               ; Display result
@@ -87,14 +87,21 @@ Result: [(result hello)]
 - Execution = repeated fusion until **saturation** (no more interactions possible)
 - Result = remaining constellation after saturation
 
-### Chaining with then
+### Chaining execs
 
-`(then c1 c2 c3)` means:
-1. Execute c1 (focused) → result r1
-2. Execute c2 with r1 as focused state → result r2
-3. Execute c3 with r2 as focused state → final result
+There is no staging form: nest `exec` instead. `(exec c3 (exec c2 c1))`
+means:
+1. Execute c1 → result r1
+2. Execute c2 against r1 → result r2
+3. Execute c3 against r2 → final result
 
-This enables sequential pipelines where each step builds on the previous.
+Long pipelines read better as a chain of named steps, each `exec`ing
+against the previous one:
+
+```stellogen
+(def s1 (exec #c2 #c1))
+(def s2 (exec #c3 #s1))
+```
 
 ## Paradigm Patterns
 
@@ -261,4 +268,4 @@ verified by `sgen check`, skipped by `sgen run`.
 ## Cleaning Results
 
 - `(def kill (-unwanted _ _))` — absorb leftover rays after execution
-- `(then (exec ...) #kill)` — chain a cleanup step
+- `(exec #kill (exec ...))` — chain a cleanup step

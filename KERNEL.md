@@ -212,9 +212,6 @@ and staging is not a variant at all:
   ongoing constellation). Every reactive partner that matched is
   consumed, alongside the source star; every catalyst that matched
   persists, since a catalyst is never exhausted by being used.
-- **Staging is derived notation.** `(then c1 c2 ...)` is a left fold of
-  executions, elaborated away before evaluation (part II); it never
-  touches the execution engine.
 
 Operationally, execution proceeds as follows:
 
@@ -245,8 +242,8 @@ not part of the result's meaning): only the saturation semantics is.
 
 The result of `exec` is re-marked as all-reactive (any `*` tags on the
 input are dropped), and is used directly as the next stage's input; there
-is no re-focusing step, since focus no longer exists. `then` chains
-`exec` calls with no extra marking (2.2).
+is no re-focusing step, since focus no longer exists. Staging is
+therefore just nesting `exec` calls, with no extra marking (2.2).
 
 Execution may diverge; that is a property of the object language,
 accepted, and it requires a catalyst somewhere: a constellation with no
@@ -284,7 +281,6 @@ or a constellation if it uses the encodings of part III).
 | `#name`, `#(name a ...)` | reference | using named things |
 | `*e` | catalyst | marking a reusable, passive star (shared with the object kernel) |
 | `(exec e ...)` | run | running interactions; each star's own mark decides its role |
-| `(then e1 e2 ...)` | staged run | derived form; a fold of `exec` |
 | `(show e ...)` | display | observation |
 | `(== e1 e2 [msg])` | assert equal | base observation (part IV) |
 | `(~= e1 e2 [msg])` | assert unifiable | base observation (part IV) |
@@ -325,7 +321,7 @@ while `sgen check` evaluates it. It is a kernel form rather than a macro
 because `def` is variadic (galaxy formation) and macros are fixed-arity: no
 macro can faithfully alias it.
 
-### 2.2 `exec`, `then`
+### 2.2 `exec`
 
 `(exec e1 ... en)` evaluates its arguments, combines them into one
 constellation (groups and galaxies flatten), and saturates it as in 1.6:
@@ -333,13 +329,11 @@ each star reacts or persists as a catalyst according to its own `*` tag.
 The result is an all-reactive constellation (1.6), with every `*` tag
 from the input gone.
 
-`(then c1 c2 ... cn)` is elaborated at read time into a left fold:
-`(then a b)` becomes `(exec b a)`, and each further step executes
-against the accumulated result of the previous ones, with no refocusing:
-an `exec` result is already reactive, so it feeds the next stage as is.
-It exists because ordering runs is glue that fixed-arity macros cannot
-express variadically; it is only special in head position (`then`
-remains an ordinary symbol inside terms).
+Staging needs no form of its own: `(exec c2 (exec c1 base))` runs `c1`
+against `base` and then `c2` against the result, with no refocusing (an
+`exec` result is already reactive, so it feeds the next stage as is).
+Long chains are usually written as a sequence of named steps, each
+`exec`ing against the previous one.
 
 ### 2.3 `forall`
 
