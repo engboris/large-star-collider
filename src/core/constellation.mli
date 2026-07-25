@@ -70,16 +70,20 @@ end
 
 (** {1 Marked Stars and Constellations} *)
 
-(** Stars marked as either reactive (linear, mutually interacting, part of the
-    result) or catalyst (duplicated at each use, inert toward other catalysts,
-    dropped from the result). *)
+(** Stars marked as reactive (linear, mutually interacting, part of the result),
+    catalyst (duplicated at each use, inert toward other catalysts, dropped from
+    the result), or seed (a reactive star tried first when the executor picks a
+    starting point). *)
 module Marked : sig
-  (** A marked star is either reactive or a catalyst *)
+  (** A marked star is reactive, a catalyst, or a seed *)
   type star =
     | Reactive of Raw.star
       (** Reactive stars are the solution: consumed by reacting *)
     | Catalyst of Raw.star
       (** Catalysts are solicited by reactive rays and persist *)
+    | Seed of Raw.star
+      (** A reactive star the executor tries first as a starting point;
+          otherwise behaves exactly like a plain reactive star *)
 
   val equal_star : star -> star -> bool
 
@@ -102,6 +106,12 @@ module Marked : sig
 
   (** Turn every star of a constellation into a catalyst *)
   val make_catalyst_all : constellation -> constellation
+
+  (** Turn a marked star into a seed *)
+  val make_seed : star -> star
+
+  (** Turn every star of a constellation into a seed *)
+  val make_seed_all : constellation -> constellation
 
   (** Remove marking from a star *)
   val remove : star -> Raw.star

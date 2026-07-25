@@ -241,11 +241,20 @@ let find_ray_fusions ~config ~emit_event ~source_idx ~source_ray_idx ~source_ray
 let exec ?(on_event = fun _ -> ()) mcs : constellation =
   let config = { var_counter = 0 } in
 
-  let catalysts, reactives =
-    List.partition_map mcs ~f:(function
-      | Marked.Catalyst s -> First s
-      | Marked.Reactive s -> Second s )
+  (* @-marked (seed) stars are tried as a starting point before plain
+     reactive stars: every scan below (internal cuts, external fusions)
+     walks the reactive list front-to-back, so moving seeds to the
+     front is enough to bias where execution starts, without touching
+     what fires, what's kept, or what's linear. Seeds fall back to plain
+     list order among themselves and relative to non-seeds. *)
+  let catalysts, seeded, plain =
+    List.fold mcs ~init:([], [], []) ~f:(fun (cs, sds, pls) -> function
+      | Marked.Catalyst s -> (s :: cs, sds, pls)
+      | Marked.Seed s -> (cs, s :: sds, pls)
+      | Marked.Reactive s -> (cs, sds, s :: pls) )
   in
+  let catalysts = List.rev catalysts in
+  let reactives = List.rev seeded @ List.rev plain in
 
   (* Internal cuts: first star holding one is replaced by its branches *)
   let try_internal reactives =

@@ -22,6 +22,7 @@ module Raw = struct
     | GuardedVar of ident
     | String of string
     | Catalyst of t
+    | Seed of t
     | Call of t
     | Static of t
     | List of t list
@@ -54,6 +55,8 @@ let cons_op = primitive "cons"
 let call_op = "#"
 
 let catalyst_op = "*"
+
+let seed_op = "@"
 
 let guard_op = primitive "!"
 
@@ -118,6 +121,11 @@ let rec expand_macro : Raw.t -> expr loc = function
   | Raw.Catalyst e' ->
     let e = expand_macro e' in
     { content = List [ { content = Symbol catalyst_op; loc = None }; e ]
+    ; loc = None
+    }
+  | Raw.Seed e' ->
+    let e = expand_macro e' in
+    { content = List [ { content = Symbol seed_op; loc = None }; e ]
     ; loc = None
     }
   | Raw.Static e' ->
@@ -477,6 +485,9 @@ let rec star_of_expr : expr -> (Marked.star, expr_err) Result.t = function
   | List [ { content = Symbol k; _ }; s ] when equal_string k catalyst_op ->
     let* ss = star_of_expr s.content in
     ss |> Marked.make_catalyst |> Result.return
+  | List [ { content = Symbol k; _ }; s ] when equal_string k seed_op ->
+    let* ss = star_of_expr s.content in
+    ss |> Marked.make_seed |> Result.return
   | List [ { content = Symbol k; _ }; s; { content = List ps; _ } ]
     when equal_string k params_op ->
     let* content = raylist_of_expr s.content in
@@ -530,6 +541,9 @@ let rec sgen_expr_of_expr ?(enclosing_loc : source_location option = None)
   | List [ { content = Symbol op; _ }; arg ] when String.equal op catalyst_op ->
     let* sgen_expr = recur arg in
     Catalyst sgen_expr |> Result.return
+  | List [ { content = Symbol op; _ }; arg ] when String.equal op seed_op ->
+    let* sgen_expr = recur arg in
+    Seed sgen_expr |> Result.return
   | List [ { content = Symbol op; _ }; rays_expr; bans_expr ]
     when String.equal op params_op ->
     (* (params rays_list bans_list) → create %params term structure *)

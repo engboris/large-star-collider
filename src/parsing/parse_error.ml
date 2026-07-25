@@ -14,6 +14,7 @@ let string_of_token = function
   | Parser.VAR s | Parser.SYM s | Parser.STRING s -> s
   | Parser.GVAR s -> "!" ^ s
   | Parser.STAR -> "*"
+  | Parser.AT -> "@"
   | Parser.BAR -> "|"
   | Parser.LPAR -> "("
   | Parser.RPAR -> ")"

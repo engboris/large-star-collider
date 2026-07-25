@@ -37,6 +37,9 @@ let rec string_of_ray = function
   | Func ((Null, "*"), [ inner ]) ->
     (* Catalyst marker *)
     Printf.sprintf "*%s" (string_of_ray inner)
+  | Func ((Null, "@"), [ inner ]) ->
+    (* Seed marker *)
+    Printf.sprintf "@%s" (string_of_ray inner)
   | Func ((Null, "%!"), [ inner ]) ->
     (* Ground guard on a position *)
     Printf.sprintf "!%s" (string_of_ray inner)

@@ -186,10 +186,15 @@ module Marked = struct
      consumed by reacting), mutually interacting, part of the result.
      Catalysts (marked with a star prefix in the source) are solicited
      by reactive rays, duplicated at each use, inert toward other
-     catalysts, and dropped from the result. *)
+     catalysts, and dropped from the result. A seed (marked with `@`) is
+     a reactive star with the same linear behavior as any other, except
+     the executor tries it as a starting point before unmarked reactive
+     stars; it is otherwise an ordinary reactive star (kept when
+     unreached, consumed when it reacts). *)
   type star =
     | Reactive of Raw.star
     | Catalyst of Raw.star
+    | Seed of Raw.star
   [@@deriving eq]
 
   type constellation = star list [@@deriving eq]
@@ -197,17 +202,24 @@ module Marked = struct
   let map ~f : star -> star = function
     | Reactive s -> Reactive { content = List.map ~f s.content; bans = s.bans }
     | Catalyst s -> Catalyst { content = List.map ~f s.content; bans = s.bans }
+    | Seed s -> Seed { content = List.map ~f s.content; bans = s.bans }
 
   let make_reactive s = Reactive s
 
   let make_reactive_all = List.map ~f:make_reactive
 
   let make_catalyst : star -> star = function
-    | Reactive s | Catalyst s -> Catalyst s
+    | Reactive s | Catalyst s | Seed s -> Catalyst s
 
   let make_catalyst_all = List.map ~f:make_catalyst
 
-  let remove : star -> Raw.star = function Reactive s | Catalyst s -> s
+  let make_seed : star -> star = function
+    | Reactive s | Catalyst s | Seed s -> Seed s
+
+  let make_seed_all = List.map ~f:make_seed
+
+  let remove : star -> Raw.star = function
+    | Reactive s | Catalyst s | Seed s -> s
 
   let remove_all = List.map ~f:remove
 end
@@ -216,7 +228,8 @@ let subst_all_vars sub = List.map ~f:(Marked.map ~f:(subst sub))
 
 let all_vars mcs : StellarSig.idvar list =
   mcs
-  |> List.concat_map ~f:(function Marked.Reactive s | Marked.Catalyst s ->
+  |> List.concat_map ~f:(function
+    | Marked.Reactive s | Marked.Catalyst s | Marked.Seed s ->
     List.concat_map s.content ~f:StellarRays.vars )
 
 let normalize_vars (mcs : Marked.constellation) =

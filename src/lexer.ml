@@ -93,6 +93,7 @@ and read lexbuf =
       pop_delimiter '{' (get_pos ());
       RBRACE
     | '*' -> STAR
+    | '@' -> AT
     | '#' -> SHARP
     | 0xA7 -> SECTION (* the section sign, written as U+00A7 *)
     | '|' -> BAR

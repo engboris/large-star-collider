@@ -20,6 +20,8 @@ let nil_sym = (Null, "%nil")
 
 let catalyst_sym = (Null, "*")
 
+let seed_sym = (Null, "@")
+
 let params_sym = (Null, "%params")
 
 let galaxy_sym = (Null, "%galaxy")
@@ -46,6 +48,7 @@ let term_of_constellation (c : Marked.constellation) : StellarRays.term =
     match s with
     | Reactive _ -> content_term
     | Catalyst _ -> Func (catalyst_sym, [ content_term ])
+    | Seed _ -> Func (seed_sym, [ content_term ])
   and star_content_to_term (s : Raw.star) : term =
     let rays_term = rays_to_term s.content in
     if List.is_empty s.bans then rays_term
@@ -84,6 +87,8 @@ let rec constellation_of_term (t : StellarRays.term) : Marked.constellation =
   | Func ((Null, "%nil"), []) -> []
   | Func ((Null, "*"), [ inner ]) ->
     constellation_of_term inner |> Marked.make_catalyst_all
+  | Func ((Null, "@"), [ inner ]) ->
+    constellation_of_term inner |> Marked.make_seed_all
   | Func ((Null, "%params"), [ rays_term; bans_term ]) ->
     let rays = rays_of_term rays_term in
     let bans = bans_of_term bans_term in
@@ -206,6 +211,9 @@ and map_ray env ~f : sgen_expr -> sgen_expr = function
   | Catalyst e ->
     let map_e = map_ray env ~f e in
     Catalyst map_e
+  | Seed e ->
+    let map_e = map_ray env ~f e in
+    Seed map_e
   | Def (id, es) -> Def (f id, List.map ~f:(map_ray env ~f) es)
   | Forall (gid, bind, body, loc) ->
     Forall (f gid, f bind, map_ray env ~f body, loc)
@@ -435,6 +443,12 @@ let rec eval_sgen_expr ?(trace_cfg : Tracer.trace_config option = None)
       constellation_of_term eval_e |> Marked.make_catalyst_all
     in
     Ok (env', term_of_constellation catalyst_constellation)
+  | Seed e ->
+    let* env', eval_e = eval_sgen_expr ~trace_cfg ~phase env e in
+    let seed_constellation =
+      constellation_of_term eval_e |> Marked.make_seed_all
+    in
+    Ok (env', term_of_constellation seed_constellation)
   | Def (identifier, exprs) -> (
     match exprs with
     | [ single ] ->

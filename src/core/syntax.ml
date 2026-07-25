@@ -20,6 +20,7 @@ type sgen_expr =
   | Exec of sgen_expr * source_location option
   | Group of sgen_expr list (* Internal: for combining multiple expressions *)
   | Catalyst of sgen_expr
+  | Seed of sgen_expr
   | Def of ident * sgen_expr list
   | Forall of ident * ident * sgen_expr * source_location option
   | Show of sgen_expr list * source_location option

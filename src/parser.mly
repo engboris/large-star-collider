@@ -7,6 +7,7 @@ open Expression.Raw
 %token <string> SYM
 %token <string> STRING
 %token STAR
+%token AT
 %token BAR
 %token LPAR RPAR
 %token LBRACK RBRACK
@@ -56,6 +57,7 @@ let raw_expr :=
   | LBRACK; ~=revlist(expr); BAR; ~=expr; RBRACK; <ConsWithBase>
   | SHARP; ~=expr; <Call>
   | STAR; ~=expr; <Catalyst>
+  | AT; ~=expr; <Seed>
   | SECTION; ~=expr; <Static>
   | ~=SYM; <Symbol>
   | ~=VAR; <Var>
