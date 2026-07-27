@@ -33,9 +33,4 @@ are migrated.
 
 - Guard strength: only full groundness for now; add a
   head-instantiated (nonvar) variant if an example demands it.
-- Staging: `then` works as a built-in; folding it into `exec` via a
-  per-ray `stage` tag remains kernel debt. Two independent pipelines
-  in one `exec` must not block each other, so the tag is probably
-  `(namespace, stage)` with `then` minting a fresh namespace. Decide
-  before implementing.
 - The wiki still documents the old `@`/`*` model.

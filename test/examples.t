@@ -65,10 +65,6 @@ Relational constraints example:
   { [(pair 1 2) || (!= 1 2)] [(pair 1 3) || (!= 1 3)] [(pair 2 1) || (!= 2 1)] [(pair 2 3) || (!= 2 3)]...
   [(pair 3 1) || (!= 3 1)] [(pair 3 2) || (!= 3 2)] }
 
-Stack example:
-  $ sgen run ../examples/stack.sg
-  (save 0)
-
 Sum types example:
   $ sgen run ../examples/sumtypes.sg
   a

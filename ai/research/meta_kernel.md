@@ -30,7 +30,7 @@ The meta-kernel divides into four strata, each with its own bar:
    anything inspecting run-time results.
 2. **Assembly** (`def`, `#`, `@`, galaxy formation): naming and grouping
    only, no computation. Essentially complete.
-3. **Execution** (`exec`, `then`): the one interaction operation. Its
+3. **Execution** (`exec`): the one interaction operation. Its
    axes are not separate execution forms but modalities on stars: `@`
    (focus) and `*` (linearity, which subsumed the former `fire`). Fair
    to add: a genuinely new axis, preferably as a modality; a step
@@ -54,13 +54,7 @@ effect), `==` (the trusted judgment). No argument.
 
 **Stranded by the fixed-arity macro system.** `spec` (settled: an alias
 of `def`, demotes when bare-symbol aliases land; see `macro_system.md`
-pillar 3) and, by exactly the same logic, `then`. `then` is semantically
-derived (`(then a b)` is `(exec b @a)`, folded left) and sits in the
-kernel only because a macro cannot be variadic. A binary `then` macro
-would work today at the cost of writing nested chains. `then` and `spec`
-are the same species of kernel debt; the alias/macro work pays both off.
-Variadic `then` is a real ergonomic win, so this is a documentation
-point, not a demotion request.
+pillar 3).
 
 **Earn their seats, but need sharper justification.**
 
@@ -154,7 +148,8 @@ One new meta-form that takes an execution result and yields its
 evaluation doc 5.2: that section covers reified *code* (programs are
 already terms at read time). This is reification of *results*. Today an
 execution result is a constellation-as-value that can only be shown,
-compared by `==`/`~=`, or fed onward as *state* via `then`; it can never
+compared by `==`/`~=`, or fed onward as the input of another `exec`; it
+can never
 be inspected as data. Quote closes that gap.
 
 With it, every observation becomes ordinary object-level programming
@@ -250,8 +245,7 @@ any debugger machinery.
    contract (plan 2.5.2), which gates everything below.
 2. **Sharpen the KERNEL.md entries** for `~=` (state the existential
    semantics or revise it) and `forall` (justify as the galaxy
-   eliminator whose content is separation); note `then` as kernel debt
-   of the same species as `spec`. Pure documentation.
+   eliminator whose content is separation). Pure documentation.
 3. **Design and implement quote** (result reification into the
    %-encoding). Small language work once the encoding contract is fixed.
 4. **Fuel axis** on the execution operation. Small language work.

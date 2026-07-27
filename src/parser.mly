@@ -40,7 +40,7 @@ let params :=
   | BAR; BAR; ~=expr+; <>
 
 (* Every expr, not just top-level declarations, is wrapped with its own
-   source span. Nested exec/then stages need their own location to be
+   source span. Nested exec stages need their own location to be
    traceable line by line, not just the declaration that encloses them. *)
 let expr :=
   | e=raw_expr; {
