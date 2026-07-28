@@ -3,8 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>Stellogen Playground</title>
+    <script>
+        // Resolve the theme before first paint so the page never flashes
+        // the wrong palette. A stored choice wins over the OS setting.
+        (function () {
+            var stored = null;
+            try { stored = localStorage.getItem('stellogen-playground-theme'); } catch (_) {}
+            var dark = stored
+                ? stored === 'dark'
+                : window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        })();
+    </script>
     <style>
+        :root {
+            --surface: #ffffff;
+            --chrome: #f4f5f7;
+            --subtle: #eceef2;
+            --border: #dcdfe6;
+            --border-strong: #c6cbd4;
+            --fg: #1b1f27;
+            --fg-muted: #626b7a;
+            --accent: #4a45c8;
+            --accent-hover: #5a55d8;
+            --accent-fg: #ffffff;
+            --danger: #c2313a;
+            --ok: #1f7a4d;
+
+            /* Polarity is the axis the language turns on, so it gets the
+               two poles of the palette: + warm, - cool. */
+            --sx-comment: #7a8494;
+            --sx-keyword: #6d4ae0;
+            --sx-string: #1f7a52;
+            --sx-number: #b45309;
+            --sx-pos: #c2410c;
+            --sx-neg: #0f766e;
+            --sx-var: #1f6feb;
+            --sx-fn: #3b3f4a;
+
+            --radius: 8px;
+            --radius-sm: 6px;
+            --editor-fs: 14px;
+            --ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        }
+
+        :root[data-theme="dark"] {
+            --surface: #14171c;
+            --chrome: #0f1116;
+            --subtle: #1a1e25;
+            --border: #2c323d;
+            --border-strong: #3d4552;
+            --fg: #e3e7ee;
+            --fg-muted: #8d97a6;
+            --accent: #6e6af0;
+            --accent-hover: #7f7bf7;
+            --accent-fg: #ffffff;
+            --danger: #ff7b7b;
+            --ok: #4ade80;
+
+            --sx-comment: #6b7585;
+            --sx-keyword: #a78bfa;
+            --sx-string: #5fd39a;
+            --sx-number: #f0b45f;
+            --sx-pos: #ff9d5c;
+            --sx-neg: #4fd1c5;
+            --sx-var: #79b8ff;
+            --sx-fn: #d7dce5;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,61 +81,256 @@
         }
 
         body {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
-            background: #f5f5f5;
-            color: #333333;
+            font-family: var(--ui);
+            font-size: 13px;
+            background: var(--chrome);
+            color: var(--fg);
             height: 100vh;
             display: flex;
             flex-direction: column;
+            -webkit-font-smoothing: antialiased;
         }
 
-        header {
-            background: #e0e0e0;
-            padding: 1rem 2rem;
-            border-bottom: 1px solid #cccccc;
-        }
+        /* ---------- Toolbar ---------- */
 
-        h1 {
-            font-size: 1.5rem;
-            color: #0066cc;
-        }
-
-        .subtitle {
-            font-size: 0.85rem;
-            color: #666666;
-            margin-top: 0.25rem;
-        }
-
-        .controls a {
-            color: #0066cc;
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-
-        .controls a:hover {
-            text-decoration: underline;
-        }
-
-        main {
-            flex: 1;
+        .toolbar {
             display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--chrome);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            display: flex;
+            align-items: baseline;
+            gap: 0.4rem;
+            margin-right: 0.5rem;
+        }
+
+        .brand-mark {
+            align-self: center;
+            flex: none;
+        }
+
+        .brand-name {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .brand-tag {
+            font-size: 12px;
+            color: var(--fg-muted);
+        }
+
+        .tagline {
+            flex: 1;
+            text-align: center;
+            font-size: 12px;
+            color: var(--fg-muted);
+            white-space: nowrap;
             overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .panel {
+        .group {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        /* Falls back to plain empty space once the tagline is hidden */
+        .toolbar .spacer {
             flex: 1;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             min-width: 0;
         }
 
-        .panel-header {
-            background: #e8e8e8;
-            padding: 0.5rem 1rem;
-            font-size: 0.9rem;
-            color: #555555;
-            border-bottom: 1px solid #cccccc;
+        /* The tagline is the first thing to go when the toolbar gets tight */
+        @media (max-width: 1080px) {
+            .tagline { display: none; }
         }
+
+        .sep {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+            margin: 0 0.25rem;
+        }
+
+        /* ---------- Controls ---------- */
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            height: 30px;
+            padding: 0 0.7rem;
+            font: inherit;
+            font-weight: 500;
+            color: var(--fg);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.12s ease, border-color 0.12s ease;
+        }
+
+        .btn:hover {
+            background: var(--subtle);
+            border-color: var(--border-strong);
+        }
+
+        .btn:active {
+            background: var(--border);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--accent-fg);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .btn-primary:active {
+            background: var(--accent);
+        }
+
+        .btn-icon {
+            width: 30px;
+            padding: 0;
+            color: var(--fg-muted);
+        }
+
+        .btn-icon:hover {
+            color: var(--fg);
+        }
+
+        .btn svg {
+            flex: none;
+        }
+
+        kbd {
+            font-family: var(--ui);
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        select {
+            height: 30px;
+            padding: 0 1.9rem 0 0.6rem;
+            font: inherit;
+            color: var(--fg);
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            /* Native arrows look dated and ignore the palette. */
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23626b7a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.55rem center;
+        }
+
+        :root[data-theme="dark"] select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238d97a6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        }
+
+        select:hover {
+            border-color: var(--border-strong);
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* ---------- Panels ---------- */
+
+        main {
+            --split: 50%;
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            background: var(--surface);
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .panel-editor {
+            flex: 0 0 var(--split);
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.4rem 0.75rem;
+            background: var(--chrome);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+        }
+
+        .panel-note {
+            font-size: 11px;
+            color: var(--fg-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #status {
+            font-size: 11px;
+            color: var(--fg-muted);
+            white-space: nowrap;
+        }
+
+        /* ---------- Splitter ---------- */
+
+        .splitter {
+            flex: none;
+            width: 5px;
+            background: var(--border);
+            border: none;
+            padding: 0;
+            cursor: col-resize;
+            transition: background 0.12s ease;
+        }
+
+        .splitter:hover,
+        .splitter.dragging {
+            background: var(--accent);
+        }
+
+        body.dragging {
+            cursor: col-resize;
+            user-select: none;
+        }
+
+        /* ---------- Editor ---------- */
 
         .editor-container {
             flex: 1;
@@ -77,24 +341,25 @@
 
         #line-numbers {
             position: relative;
-            background: #f5f5f5;
-            color: #999999;
-            font-size: 14px;
-            line-height: 1.5;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            background: var(--surface);
+            color: var(--fg-muted);
+            font-size: var(--editor-fs);
+            line-height: 1.6;
+            font-family: var(--mono);
             text-align: right;
             user-select: none;
-            border-right: 1px solid #e0e0e0;
+            border-right: 1px solid var(--border);
             overflow: hidden;
             white-space: pre;
-            min-width: 3em;
+            min-width: 3.25em;
+            opacity: 0.6;
         }
 
         /* Translated to follow the editor's scroll; it must not scroll on
            its own, or its scroll range can drift from the textarea's
            (whose scrollbars eat into its viewport on some platforms). */
         #line-numbers-content {
-            padding: 1rem 0.5rem 1rem 1rem;
+            padding: 1rem 0.6rem 1rem 1rem;
             will-change: transform;
         }
 
@@ -102,7 +367,7 @@
             flex: 1;
             position: relative;
             overflow: hidden;
-            background: #ffffff;
+            background: var(--surface);
         }
 
         #editor {
@@ -114,17 +379,22 @@
             padding: 1rem;
             background: transparent;
             color: transparent;
-            caret-color: #333333;
-            font-size: 14px;
-            line-height: 1.5;
+            caret-color: var(--accent);
+            font-size: var(--editor-fs);
+            line-height: 1.6;
             resize: none;
             border: none;
             outline: none;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-family: var(--mono);
             overflow-y: auto;
             white-space: pre;
             overflow-wrap: normal;
             z-index: 2;
+            tab-size: 2;
+        }
+
+        #editor::selection {
+            background: color-mix(in srgb, var(--accent) 28%, transparent);
         }
 
         /* Same idea as #line-numbers-content: no own scrolling, follows
@@ -137,229 +407,206 @@
             min-width: 100%;
             min-height: 100%;
             padding: 1rem;
-            color: #333333;
-            font-size: 14px;
-            line-height: 1.5;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            color: var(--fg);
+            font-size: var(--editor-fs);
+            line-height: 1.6;
+            font-family: var(--mono);
             white-space: pre;
             overflow-wrap: normal;
             pointer-events: none;
             z-index: 1;
             will-change: transform;
+            tab-size: 2;
         }
 
-        /* Syntax highlighting colors */
-        .sg-comment { color: #7f8c8d; font-style: italic; }
-        .sg-keyword { color: #9b59b6; font-weight: bold; }
-        .sg-string { color: #27ae60; }
-        .sg-number { color: #e67e22; }
-        .sg-polarity { color: #e74c3c; font-weight: bold; }
-        .sg-operator { color: #3498db; }
-        .sg-variable { color: #2980b9; }
-        .sg-function { color: #8e44ad; }
+        /* Syntax highlighting */
+        .sg-comment { color: var(--sx-comment); font-style: italic; }
+        .sg-keyword { color: var(--sx-keyword); font-weight: 600; }
+        .sg-string { color: var(--sx-string); }
+        .sg-number { color: var(--sx-number); }
+        .sg-pos { color: var(--sx-pos); font-weight: 700; }
+        .sg-neg { color: var(--sx-neg); font-weight: 700; }
+        .sg-operator { color: var(--sx-keyword); }
+        .sg-variable { color: var(--sx-var); }
+        .sg-function { color: var(--sx-fn); font-weight: 500; }
+
+        /* ---------- Output ---------- */
 
         #output {
             flex: 1;
             padding: 1rem;
-            background: #ffffff;
-            color: #333333;
-            font-size: 14px;
-            line-height: 1.5;
-            overflow-y: auto;
+            background: var(--surface);
+            color: var(--fg);
+            font-family: var(--mono);
+            font-size: var(--editor-fs);
+            line-height: 1.6;
+            overflow: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
         }
 
-        .controls {
-            padding: 1rem 2rem;
-            background: #e0e0e0;
-            border-top: 1px solid #cccccc;
-            display: flex;
-            gap: 1rem;
-            align-items: center;
+        #output.muted { color: var(--fg-muted); }
+        #output.error { color: var(--danger); }
+        #output.success { color: var(--fg); }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { transition: none !important; }
         }
 
-        button {
-            background: #0066cc;
-            color: white;
-            border: none;
-            padding: 0.5rem 1.5rem;
-            font-size: 0.9rem;
-            cursor: pointer;
-            border-radius: 2px;
-            font-family: inherit;
-        }
-
-        button:hover {
-            background: #0077dd;
-        }
-
-        button:active {
-            background: #0055bb;
-        }
-
-        /* Eval is the normal action; the single-phase buttons stay quieter */
-        button.secondary {
-            background: #ffffff;
-            color: #333333;
-            border: 1px solid #cccccc;
-            padding: 0.5rem 1rem;
-        }
-
-        button.secondary:hover {
-            background: #f0f0f0;
-        }
-
-        button.secondary:active {
-            background: #e0e0e0;
-        }
-
-        select {
-            background: #ffffff;
-            color: #333333;
-            border: 1px solid #cccccc;
-            padding: 0.5rem;
-            font-size: 0.9rem;
-            cursor: pointer;
-            font-family: inherit;
-            border-radius: 2px;
-        }
-
-        select:hover {
-            background: #f0f0f0;
-        }
-
-        .divider {
-            width: 1px;
-            background: #cccccc;
-        }
-
-        .error {
-            color: #d32f2f;
-        }
-
-        .success {
-            color: #2e7d32;
-        }
-
-        #status {
-            font-size: 0.85rem;
-            color: #666666;
-            margin-left: auto;
-        }
-
-        /* Mobile layout: stack vertically with output on top */
+        /* Mobile: stack vertically with the output above the editor */
         @media (max-width: 768px) {
+            :root { --editor-fs: 16px; }  /* 16px stops iOS zooming on focus */
+
             main {
                 flex-direction: column-reverse;
             }
 
-            .divider {
-                height: 1px;
-                width: 100%;
-                background: #cccccc;
+            .panel,
+            .panel-editor {
+                flex: 1 1 auto;
+                min-height: 180px;
             }
 
-            .panel {
-                min-height: 200px;
+            .splitter {
+                display: none;
             }
 
-            .controls {
-                flex-wrap: wrap;
-                gap: 0.5rem;
+            .toolbar {
+                gap: 0.35rem;
+                padding: 0.5rem;
             }
 
-            header {
-                padding: 0.75rem 1rem;
+            .toolbar .spacer,
+            .brand-tag,
+            .sep {
+                display: none;
             }
 
-            h1 {
-                font-size: 1.25rem;
+            /* A small flex-basis is what keeps the toolbar at two rows:
+               the picker's natural width (set by the longest example name)
+               would fill the row on its own and push the icons to a third.
+               It grows back into whatever slack is left. */
+            select {
+                flex: 1 1 100px;
+                min-width: 0;
             }
 
-            .subtitle {
-                font-size: 0.75rem;
+            .panel-note {
+                display: none;
             }
 
-            /* Fix cursor visibility on mobile */
             #editor {
-                /* Use a solid caret color with high contrast */
-                caret-color: #0066cc;
-                /* Prevent iOS zoom on focus */
-                font-size: 16px;
-                /* Improve touch target */
                 -webkit-tap-highlight-color: transparent;
                 /* Force hardware acceleration for smoother cursor rendering */
-                -webkit-transform: translate3d(0, 0, 0);
                 transform: translate3d(0, 0, 0);
-            }
-
-            #highlight-layer {
-                /* Match mobile editor font size */
-                font-size: 16px;
-            }
-
-            #line-numbers {
-                /* Match mobile editor font size */
-                font-size: 16px;
             }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>Stellogen Playground</h1>
-        <div class="subtitle">Logic-agnostic programming based on term unification</div>
+    <header class="toolbar">
+        <div class="brand">
+            <!-- Two dual rays meeting: the fusion the language is built on -->
+            <svg class="brand-mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.75" opacity="0.4"/>
+                <circle cx="12" cy="12" r="4.5" fill="var(--sx-pos)"/>
+                <path d="M12 7.5a4.5 4.5 0 010 9z" fill="var(--sx-neg)"/>
+            </svg>
+            <span class="brand-name">Stellogen</span>
+            <span class="brand-tag">Playground</span>
+        </div>
+
+        <div class="group">
+            <button id="evalBtn" class="btn btn-primary" title="Check, then run">
+                Eval <kbd id="evalKbd">Ctrl+&crarr;</kbd>
+            </button>
+            <button id="runBtn" class="btn" title="Run phase only">Run</button>
+            <button id="checkBtn" class="btn" title="Check phase only">Check</button>
+        </div>
+
+        <span class="sep"></span>
+
+        <select id="examples" aria-label="Load an example">
+            <option value="blank">Blank</option>
+            <option value="hello" selected>Hello</option>
+            <option value="macros">Macros</option>
+            <option value="circuits">Boolean Circuits</option>
+            <option value="lambda-linear">Linear Lambda Calculus</option>
+            <option value="relational-arithmetic">Relational - Arithmetic</option>
+            <option value="relational-joins">Relational - Joins</option>
+            <option value="states-nfa">NFA (Finite Automaton)</option>
+            <option value="states-npda">NPDA (Pushdown Automaton)</option>
+            <option value="states-turing">Turing Machine</option>
+            <option value="proofnets-mll">Proof Nets - MLL</option>
+        </select>
+
+        <div class="group">
+            <button id="clearBtn" class="btn btn-icon" title="Clear the editor" aria-label="Clear the editor">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>
+                </svg>
+            </button>
+            <button id="importBtn" class="btn btn-icon" title="Open a .sg file" aria-label="Open a .sg file">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 16V4M7 9l5-5 5 5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/>
+                </svg>
+            </button>
+            <button id="exportBtn" class="btn btn-icon" title="Save as a .sg file" aria-label="Save as a .sg file">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 4v12M7 11l5 5 5-5M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/>
+                </svg>
+            </button>
+        </div>
+
+        <span class="spacer">
+            <span class="tagline">Logic-agnostic programming based on term unification</span>
+        </span>
+
+        <div class="group">
+            <a class="btn btn-icon" href="https://github.com/engboris/stellogen/wiki/Basics-of-Stellogen"
+               target="_blank" rel="noopener noreferrer" title="Read the tutorial" aria-label="Read the tutorial">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 5a2 2 0 012-2h5v18H6a2 2 0 01-2-2V5zM20 5a2 2 0 00-2-2h-5v18h5a2 2 0 002-2V5z"/>
+                </svg>
+            </a>
+            <button id="themeBtn" class="btn btn-icon" title="Switch theme" aria-label="Switch theme">
+                <svg id="themeIcon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+            </button>
+        </div>
+
+        <input type="file" id="fileInput" accept=".sg,.stellogen,.txt" style="display: none;">
     </header>
 
-    <main>
-        <div class="panel">
-            <div class="panel-header">Editor</div>
+    <main id="main">
+        <section class="panel panel-editor">
+            <div class="panel-header">
+                <span class="panel-title">Editor</span>
+                <span class="panel-note" id="editorNote">Ctrl+Enter to eval, Ctrl+Shift+Enter to check</span>
+            </div>
             <div class="editor-container">
                 <div id="line-numbers" aria-hidden="true"><div id="line-numbers-content"></div></div>
                 <div class="editor-wrapper">
                     <div id="highlight-layer" aria-hidden="true"></div>
-                    <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">; A positive ray offers a greeting; a negative ray requests it.
+                    <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Stellogen source code">; A positive ray offers a greeting; a negative ray requests it.
 ; `show` displays the result of their fusion.
 
 (def greeter [(+hello X) (hello X)])
 (show (exec #greeter [(-hello world)]))  ; => (hello world)</textarea>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="divider"></div>
+        <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"
+             aria-label="Resize the editor" tabindex="0"></div>
 
-        <div class="panel">
-            <div class="panel-header">Output</div>
-            <div id="output">Click "Eval" to evaluate your code...</div>
-        </div>
+        <section class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Output</span>
+                <span id="status"></span>
+            </div>
+            <div id="output" class="muted" aria-live="polite">Press Eval to see the result.</div>
+        </section>
     </main>
-
-    <div class="controls">
-        <button id="evalBtn">Eval</button>
-        <button id="runBtn" class="secondary">Run</button>
-        <button id="checkBtn" class="secondary">Check</button>
-        <select id="examples">
-            <option value="blank">Blank</option>
-            <option value="hello" selected>Hello</option>
-            <option value="macros">Macros</option>
-            <option value="relational-arithmetic">Relational - Arithmetic</option>
-            <option value="relational-joins">Relational - Joins</option>
-            <option value="states-nfa">NFA (Finite Automaton)</option>
-            <option value="states-npda">NPDA (Pushdown Automaton)</option>
-            <option value="states-turing">Turing Machine</option>
-            <option value="proofnets-mall">Proof Nets - MALL</option>
-            <option value="proofnets-mll">Proof Nets - MLL</option>
-            <option value="proofnets-fomll">Proof Nets - FOMLL</option>
-        </select>
-        <button id="clearBtn">Clear</button>
-        <button id="importBtn">📁 Import</button>
-        <button id="exportBtn">💾 Export</button>
-        <input type="file" id="fileInput" accept=".sg,.stellogen,.txt" style="display: none;">
-        <a href="https://github.com/engboris/stellogen/wiki/Basics-of-Stellogen" target="_blank" rel="noopener noreferrer">📖 Tutorial</a>
-        <span id="status"></span>
-    </div>
 
     <script src="examples.js"></script>
     <script>
@@ -373,13 +620,58 @@
         const clearBtn = document.getElementById('clearBtn');
         const importBtn = document.getElementById('importBtn');
         const exportBtn = document.getElementById('exportBtn');
+        const themeBtn = document.getElementById('themeBtn');
+        const themeIcon = document.getElementById('themeIcon');
         const fileInput = document.getElementById('fileInput');
         const examplesSelect = document.getElementById('examples');
         const status = document.getElementById('status');
+        const main = document.getElementById('main');
+        const splitter = document.getElementById('splitter');
+        const editorPanel = document.querySelector('.panel-editor');
+
+        const EMPTY_OUTPUT = 'Press Eval to see the result.';
 
         // Examples are now loaded from examples.js (auto-generated from examples/*.sg)
 
-        // Syntax highlighting function
+        // ---------- Theme ----------
+
+        const THEME_KEY = 'stellogen-playground-theme';
+        const SUN = '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/>';
+        const MOON = '<path d="M20 14.5A8.5 8.5 0 019.5 4 8.5 8.5 0 1020 14.5z"/>';
+
+        function paintThemeIcon() {
+            const dark = document.documentElement.dataset.theme === 'dark';
+            // Show what a click gives you, not what you already have
+            themeIcon.innerHTML = dark ? SUN : MOON;
+            themeBtn.title = dark ? 'Switch to light theme' : 'Switch to dark theme';
+        }
+        paintThemeIcon();
+
+        themeBtn.addEventListener('click', () => {
+            const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = next;
+            try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+            paintThemeIcon();
+        });
+
+        // Follow the OS while the user has not picked a theme by hand
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            let stored = null;
+            try { stored = localStorage.getItem(THEME_KEY); } catch (_) {}
+            if (stored) return;
+            document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
+            paintThemeIcon();
+        });
+
+        // Mac users expect Cmd, not Ctrl (the handler accepts either)
+        if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
+            document.getElementById('evalKbd').innerHTML = '&#8984;&crarr;';
+            document.getElementById('editorNote').textContent =
+                '⌘Enter to eval, ⌘⇧Enter to check';
+        }
+
+        // ---------- Syntax highlighting ----------
+
         function highlightSyntax(code) {
             // Escape HTML
             const escapeHtml = (text) => {
@@ -418,11 +710,12 @@
                     }
                 }
 
-                // Polarity + function
+                // Polarity + function. The two polarities are coloured apart:
+                // + and - are the axis the whole language turns on
                 if (!matched && (code[pos] === '+' || code[pos] === '-')) {
                     const match = code.substring(pos).match(/^([+-])([a-z_][a-zA-Z0-9_]*)/);
                     if (match) {
-                        tokens.push({ type: 'polarity', text: match[1] });
+                        tokens.push({ type: match[1] === '+' ? 'pos' : 'neg', text: match[1] });
                         tokens.push({ type: 'function', text: match[2] });
                         pos += match[0].length;
                         matched = true;
@@ -475,7 +768,8 @@
                     case 'keyword': html += `<span class="sg-keyword">${escaped}</span>`; break;
                     case 'string': html += `<span class="sg-string">${escaped}</span>`; break;
                     case 'number': html += `<span class="sg-number">${escaped}</span>`; break;
-                    case 'polarity': html += `<span class="sg-polarity">${escaped}</span>`; break;
+                    case 'pos': html += `<span class="sg-pos">${escaped}</span>`; break;
+                    case 'neg': html += `<span class="sg-neg">${escaped}</span>`; break;
                     case 'operator': html += `<span class="sg-operator">${escaped}</span>`; break;
                     case 'variable': html += `<span class="sg-variable">${escaped}</span>`; break;
                     case 'function': html += `<span class="sg-function">${escaped}</span>`; break;
@@ -549,6 +843,57 @@
         // Initial highlight
         updateHighlighting();
 
+        // ---------- Splitter ----------
+
+        // The split is a flex-basis on the editor panel, kept in a custom
+        // property so the mobile layout can ignore it entirely.
+        const MIN_PANEL = 200;
+
+        function setSplit(px) {
+            const total = main.clientWidth - splitter.offsetWidth;
+            const clamped = Math.min(Math.max(px, MIN_PANEL), total - MIN_PANEL);
+            main.style.setProperty('--split', clamped + 'px');
+        }
+
+        splitter.addEventListener('pointerdown', (e) => {
+            if (window.innerWidth <= 768) return;
+            e.preventDefault();
+            splitter.setPointerCapture(e.pointerId);
+            splitter.classList.add('dragging');
+            document.body.classList.add('dragging');
+        });
+
+        splitter.addEventListener('pointermove', (e) => {
+            if (!splitter.classList.contains('dragging')) return;
+            setSplit(e.clientX - main.getBoundingClientRect().left);
+        });
+
+        function endDrag() {
+            splitter.classList.remove('dragging');
+            document.body.classList.remove('dragging');
+        }
+        splitter.addEventListener('pointerup', endDrag);
+        splitter.addEventListener('pointercancel', endDrag);
+
+        // Double-click restores the even split
+        splitter.addEventListener('dblclick', () => {
+            main.style.setProperty('--split', '50%');
+        });
+
+        splitter.addEventListener('keydown', (e) => {
+            const step = e.shiftKey ? 64 : 16;
+            if (e.key === 'ArrowLeft') {
+                setSplit(editorPanel.offsetWidth - step);
+            } else if (e.key === 'ArrowRight') {
+                setSplit(editorPanel.offsetWidth + step);
+            } else {
+                return;
+            }
+            e.preventDefault();
+        });
+
+        // ---------- Execution ----------
+
         // The interpreter runs in a web worker so the page stays responsive
         // and a diverging program can be terminated instead of freezing the
         // tab. Note: workers require serving over HTTP, not file://.
@@ -596,7 +941,7 @@
             const id = ++nextId;
             status.textContent = STATUS_LABELS[mode];
             output.textContent = 'Executing...';
-            output.className = '';
+            output.className = 'muted';
             const timer = setTimeout(() => {
                 pending = null;
                 worker.terminate();
@@ -625,8 +970,8 @@
             examplesSelect.value = 'blank';
             editor.value = '';
             saveDraft('');
-            output.textContent = 'Click "Eval" to evaluate your code...';
-            output.className = '';
+            output.textContent = EMPTY_OUTPUT;
+            output.className = 'muted';
             updateHighlighting();
         }
 
@@ -648,7 +993,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            status.textContent = 'Exported!';
+            status.textContent = 'Saved';
             setTimeout(() => status.textContent = '', 2000);
         }
 
@@ -668,12 +1013,12 @@
                 editor.value = event.target.result;
                 saveDraft(editor.value);
                 updateHighlighting();
-                status.textContent = `Imported: ${file.name}`;
+                status.textContent = `Opened ${file.name}`;
                 setTimeout(() => status.textContent = '', 2000);
             };
             reader.onerror = () => {
-                status.textContent = 'Import failed!';
-                setTimeout(() => status.textContent = '', 2000);
+                status.textContent = 'Could not read that file';
+                setTimeout(() => status.textContent = '', 3000);
             };
             reader.readAsText(file);
 
