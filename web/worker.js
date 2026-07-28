@@ -23,7 +23,11 @@ self.onmessage = async (e) => {
   const { id, mode, code } = e.data;
   try {
     await ready;
-    const result = mode === 'check' ? Stellogen.check(code) : Stellogen.run(code);
+    // 'eval' is the default: both phases, like the sgen command
+    const result =
+      mode === 'check' ? Stellogen.check(code) :
+      mode === 'run' ? Stellogen.run(code) :
+      Stellogen.eval(code);
     self.postMessage({ id, result });
   } catch (err) {
     // "ERROR: " prefix is how index.html recognizes failures

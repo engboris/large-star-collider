@@ -26,17 +26,26 @@ let with_program input_file f =
     print_err (ExprError (expr_error, loc, []));
     Stdlib.exit 1
 
-let run input_file =
-  with_program input_file (fun program ->
-    match Evaluator.eval_program program with
-    | Ok _ -> ()
-    | Error _ -> Stdlib.exit 1 )
+let run_phase program =
+  match Evaluator.eval_program program with
+  | Ok _ -> ()
+  | Error _ -> Stdlib.exit 1
 
-let check input_file =
+let check_phase program =
+  let _env, errors = Evaluator.eval_program_check program in
+  List.iter errors ~f:print_err;
+  if not (List.is_empty errors) then Stdlib.exit 1
+
+let run input_file = with_program input_file run_phase
+
+let check input_file = with_program input_file check_phase
+
+(* Both phases of the same file, check first: a failed check means the run
+   phase is never attempted. *)
+let eval input_file =
   with_program input_file (fun program ->
-    let _env, errors = Evaluator.eval_program_check program in
-    List.iter errors ~f:print_err;
-    if not (List.is_empty errors) then Stdlib.exit 1 )
+    check_phase program;
+    run_phase program )
 
 let trace input_file =
   with_program input_file (fun program ->
@@ -75,6 +84,11 @@ let check_cmd =
   let term = Term.(const (wrap check) $ input_file_arg |> term_result) in
   Cmd.v (Cmd.info "check" ~doc) term
 
+let eval_cmd =
+  let doc = "Evaluate both phases of the Stellogen program (check, then run)" in
+  let term = Term.(const (wrap eval) $ input_file_arg |> term_result) in
+  Cmd.v (Cmd.info "eval" ~doc) term
+
 let trace_cmd =
   let doc = "Run the Stellogen program with interactive execution trace" in
   let term = Term.(const (wrap trace) $ input_file_arg |> term_result) in
@@ -90,6 +104,6 @@ let preprocess_cmd =
 let default_cmd =
   let doc = "Stellogen: code generator and evaluator" in
   Cmd.group (Cmd.info "sgen" ~doc)
-    [ run_cmd; check_cmd; trace_cmd; preprocess_cmd ]
+    [ run_cmd; check_cmd; eval_cmd; trace_cmd; preprocess_cmd ]
 
 let () = Stdlib.exit (Cmd.eval default_cmd)

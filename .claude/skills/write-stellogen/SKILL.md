@@ -66,7 +66,8 @@ when writing code:
 - A value that is both type-checked and used by the run program must be
   an `object`; a value only ever type-checked can be `§(def ...)`
 - Place each check right after the definition it checks
-- Verify with BOTH commands: `sgen run file.sg` and `sgen check file.sg`
+- Verify with `sgen eval file.sg`, which does both phases (check first,
+  then run); `sgen run` / `sgen check` isolate one phase when needed
 
 ## Output
 

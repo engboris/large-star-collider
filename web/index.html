@@ -198,6 +198,22 @@
             background: #0055bb;
         }
 
+        /* Eval is the normal action; the single-phase buttons stay quieter */
+        button.secondary {
+            background: #ffffff;
+            color: #333333;
+            border: 1px solid #cccccc;
+            padding: 0.5rem 1rem;
+        }
+
+        button.secondary:hover {
+            background: #f0f0f0;
+        }
+
+        button.secondary:active {
+            background: #e0e0e0;
+        }
+
         select {
             background: #ffffff;
             color: #333333;
@@ -316,13 +332,14 @@
 
         <div class="panel">
             <div class="panel-header">Output</div>
-            <div id="output">Click "Run" to execute your code...</div>
+            <div id="output">Click "Eval" to evaluate your code...</div>
         </div>
     </main>
 
     <div class="controls">
-        <button id="runBtn">Run</button>
-        <button id="checkBtn">Check</button>
+        <button id="evalBtn">Eval</button>
+        <button id="runBtn" class="secondary">Run</button>
+        <button id="checkBtn" class="secondary">Check</button>
         <select id="examples">
             <option value="blank">Blank</option>
             <option value="hello" selected>Hello</option>
@@ -350,6 +367,7 @@
         const highlightLayer = document.getElementById('highlight-layer');
         const lineNumbers = document.getElementById('line-numbers-content');
         const output = document.getElementById('output');
+        const evalBtn = document.getElementById('evalBtn');
         const runBtn = document.getElementById('runBtn');
         const checkBtn = document.getElementById('checkBtn');
         const clearBtn = document.getElementById('clearBtn');
@@ -571,10 +589,12 @@
             if (!failed) setTimeout(() => status.textContent = '', 2000);
         }
 
+        const STATUS_LABELS = { eval: 'Evaluating...', run: 'Running...', check: 'Checking...' };
+
         function execute(mode) {
             if (pending) return; // one execution at a time
             const id = ++nextId;
-            status.textContent = mode === 'check' ? 'Checking...' : 'Running...';
+            status.textContent = STATUS_LABELS[mode];
             output.textContent = 'Executing...';
             output.className = '';
             const timer = setTimeout(() => {
@@ -589,6 +609,10 @@
             worker.postMessage({ id, mode, code: editor.value });
         }
 
+        function evalCode() {
+            execute('eval');
+        }
+
         function runCode() {
             execute('run');
         }
@@ -601,7 +625,7 @@
             examplesSelect.value = 'blank';
             editor.value = '';
             saveDraft('');
-            output.textContent = 'Click "Run" to execute your code...';
+            output.textContent = 'Click "Eval" to evaluate your code...';
             output.className = '';
             updateHighlighting();
         }
@@ -657,6 +681,7 @@
             e.target.value = '';
         });
 
+        evalBtn.addEventListener('click', evalCode);
         runBtn.addEventListener('click', runCode);
         checkBtn.addEventListener('click', checkCode);
         clearBtn.addEventListener('click', clear);
@@ -678,11 +703,11 @@
 
         // Keyboard shortcuts
         editor.addEventListener('keydown', (e) => {
-            // Ctrl+Enter to run, Ctrl+Shift+Enter to check (Cmd on Mac)
+            // Ctrl+Enter to eval, Ctrl+Shift+Enter to check (Cmd on Mac)
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 e.preventDefault();
                 if (e.shiftKey) checkCode();
-                else runCode();
+                else evalCode();
                 return;
             }
 

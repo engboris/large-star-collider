@@ -28,9 +28,19 @@ let with_shows msg =
   let output = get_output () in
   if String.is_empty output then msg else output ^ "\n" ^ msg
 
+(* Glue output sections together, dropping the empty ones so a phase that
+   printed nothing leaves no blank line behind *)
+let join_sections sections =
+  List.filter sections ~f:(fun s -> not (String.is_empty s))
+  |> String.concat ~sep:"\n"
+
 let count_check_items program =
   List.count program ~f:(fun (item_phase, _) ->
     match item_phase with Syntax.CheckOnly -> true | _ -> false )
+
+let check_items_count n =
+  if n = 1 then "1 check-phase item"
+  else Printf.sprintf "%d check-phase items" n
 
 let eval_with_buffer (code : string)
   (eval : Syntax.program -> (string, string) Result.t) =
@@ -57,9 +67,9 @@ let run_from_string (code : string) : (string, string) Result.t =
       if String.is_empty output && checked > 0 then
         Ok
           (Printf.sprintf
-             "No run-phase output. %d check-phase items were skipped; use \
-              Check to evaluate them."
-             checked )
+             "No run-phase output, %s skipped. Use Eval or Check to evaluate \
+              them."
+             (check_items_count checked) )
       else Ok output
     | Error err -> Error (with_shows (format_err err)) )
 
@@ -74,9 +84,36 @@ let check_from_string (code : string) : (string, string) Result.t =
       let summary =
         if checked = 0 then
           "Nothing to check: no check-phase items (marked with \xc2\xa7)."
-        else Printf.sprintf "Check passed (%d check-phase items)." checked
+        else Printf.sprintf "Check passed (%s)." (check_items_count checked)
       in
       Ok (with_shows summary)
     | _ ->
       let messages = List.map errors ~f:format_err |> String.concat ~sep:"\n" in
       Error (with_shows messages) )
+
+(* Both phases of a program, like 'sgen eval': the check phase first, then
+   the run phase only if it passed. The two phases print in order, with the
+   check summary between them since the playground has no exit code. *)
+let eval_from_string (code : string) : (string, string) Result.t =
+  eval_with_buffer code (fun program ->
+    let checked = count_check_items program in
+    let _env, check_errors = Evaluator.eval_program_check program in
+    let check_output = get_output () in
+    clear_output ();
+    match check_errors with
+    | _ :: _ ->
+      let messages =
+        List.map check_errors ~f:format_err |> String.concat ~sep:"\n"
+      in
+      Error (join_sections [ check_output; messages ])
+    | [] -> (
+      let summary =
+        if checked = 0 then ""
+        else Printf.sprintf "Check passed (%s)." (check_items_count checked)
+      in
+      match Evaluator.eval_program_internal Syntax.initial_env program with
+      | Ok _ -> Ok (join_sections [ check_output; summary; get_output () ])
+      | Error err ->
+        Error
+          (join_sections
+             [ check_output; summary; get_output (); format_err err ] ) ) )
