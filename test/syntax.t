@@ -29,10 +29,18 @@ Variable identity is the (name, index) pair, not its printed form:
   $ sgen run syntax/var_index_collision.sg
   [(out a) (h V1) (h V2) (h V3) (h V4) (h V5) (h V6) (h V7) (h V8) (h V9) (h X)]
 
+String literals print quoted, and escape sequences work:
+  $ sgen run syntax/strings.sg
+  "hello"
+  [(f "x") "y"]
+  "a \"quoted\" one"
+  "tab:\there"
+  "backslash:\\"
+
 Polarity is read off a symbol, never off string contents or a bare +/-:
   $ sgen run syntax/polarity_of_symbols.sg
-  { [+a ok] [-a no] }
-  
+  { ["+a" ok] ["-a" no] }
+  ""
   { [(result X + Y = R) one] [(result a - b = c) two] }
   [(result X + Y = R) (result 1 + 2 = 3)]
   [one two]

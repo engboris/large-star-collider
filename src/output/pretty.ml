@@ -10,6 +10,15 @@ let string_of_polsym (p, f) = string_of_polarity p ^ f
 let string_of_var (x, index_opt) =
   match index_opt with None -> x | Some i -> x ^ Int.to_string i
 
+(* Mirror of the escapes the lexer accepts inside a string literal. *)
+let escape_string_contents =
+  String.concat_map ~f:(function
+    | '\\' -> "\\\\"
+    | '"' -> "\\\""
+    | '\n' -> "\\n"
+    | '\t' -> "\\t"
+    | c -> String.of_char c )
+
 let rec string_of_ray = function
   | Var var -> string_of_var var
   | Func (pf, []) -> string_of_polsym pf
@@ -46,6 +55,8 @@ let rec string_of_ray = function
   | Func ((Null, "%params"), [ rays; bans ]) ->
     (* Star with constraints *)
     Printf.sprintf "%s || %s" (string_of_ray rays) (string_of_ray bans)
+  | Func ((Null, "%string"), [ Func ((Null, s), []) ]) ->
+    Printf.sprintf "\"%s\"" (escape_string_contents s)
   | Func ((Null, "%string"), [ content ]) -> string_of_ray content
   | Func (pf, terms) ->
     Printf.sprintf "(%s %s)" (string_of_polsym pf)

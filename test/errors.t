@@ -21,11 +21,11 @@ Test unterminated string literal:
 
 Test unknown escape sequence:
   $ sgen run errors/unknown_escape.sg
-  error: Unknown escape sequence '\'
-    --> errors/unknown_escape.sg:2:19
+  error: Unknown escape sequence '\x'
+    --> errors/unknown_escape.sg:2:18
   
       2 | (def test "hello\xworld")
-        |                   ^
+        |                  ^
   
   
   found 1 error(s)
@@ -33,11 +33,11 @@ Test unknown escape sequence:
 
 Test invalid escape sequence:
   $ sgen run errors/invalid_string_char.sg
-  error: Unknown escape sequence '\'
-    --> errors/invalid_string_char.sg:2:19
+  error: Unknown escape sequence '\q'
+    --> errors/invalid_string_char.sg:2:18
   
       2 | (def test "valid\qinvalid")
-        |                   ^
+        |                  ^
   
   
   found 1 error(s)

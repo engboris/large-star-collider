@@ -120,19 +120,23 @@ and string_literal lexbuf =
   let rec loop () =
     match%sedlex lexbuf with
     | '"' -> STRING (Buffer.contents buffer)
-    | '\\', any ->
+    | '\\' ->
+      (* The escaped character is read here: matching it together with
+         the backslash above would leave this match on the character
+         after it. *)
       let escaped =
         match%sedlex lexbuf with
         | 'n' -> '\n'
         | 't' -> '\t'
         | '\\' -> '\\'
         | '"' -> '"'
-        | _ ->
+        | any ->
           let msg =
             Printf.sprintf "Unknown escape sequence '\\%s'"
               (Sedlexing.Utf8.lexeme lexbuf)
           in
           raise (LexerError (msg, get_pos ()))
+        | _ -> raise (LexerError ("Unterminated string literal", get_pos ()))
       in
       Buffer.add_char buffer escaped;
       loop ()
