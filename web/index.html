@@ -206,6 +206,26 @@
             background: var(--accent);
         }
 
+        /* inline-flex would otherwise win over the hidden attribute */
+        .btn[hidden] {
+            display: none;
+        }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+        .btn:disabled:hover {
+            background: var(--surface);
+            border-color: var(--border);
+        }
+
+        .btn-primary:disabled:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
         .btn-icon {
             width: 30px;
             padding: 0;
@@ -430,6 +450,21 @@
         .sg-variable { color: var(--sx-var); }
         .sg-function { color: var(--sx-fn); font-weight: 500; }
 
+        /* The delimiter under the caret and its partner. Boxed rather than
+           recoloured: in a language this paren-heavy, a colour swap on a
+           single glyph is easy to miss. */
+        .sg-match {
+            background: color-mix(in srgb, var(--accent) 22%, transparent);
+            box-shadow: 0 0 0 1px var(--accent);
+            border-radius: 2px;
+        }
+
+        .sg-unmatched {
+            color: var(--danger);
+            background: color-mix(in srgb, var(--danger) 16%, transparent);
+            border-radius: 2px;
+        }
+
         /* ---------- Output ---------- */
 
         #output {
@@ -522,6 +557,7 @@
             </button>
             <button id="runBtn" class="btn" title="Run phase only">Run</button>
             <button id="checkBtn" class="btn" title="Check phase only">Check</button>
+            <button id="stopBtn" class="btn" title="Stop the running program" hidden>Stop</button>
         </div>
 
         <span class="sep"></span>
@@ -617,6 +653,7 @@
         const evalBtn = document.getElementById('evalBtn');
         const runBtn = document.getElementById('runBtn');
         const checkBtn = document.getElementById('checkBtn');
+        const stopBtn = document.getElementById('stopBtn');
         const clearBtn = document.getElementById('clearBtn');
         const importBtn = document.getElementById('importBtn');
         const exportBtn = document.getElementById('exportBtn');
@@ -670,9 +707,124 @@
                 '⌘Enter to eval, ⌘⇧Enter to check';
         }
 
+        // ---------- Editing ----------
+
+        // Assigning to editor.value throws the textarea's native undo stack
+        // away, which is why Ctrl+Z used to misbehave after a Tab, an
+        // import or an example load. Going through the document's own
+        // editing command keeps the history instead, so an example dropped
+        // on top of your work is now just an undo away.
+        function editRange(start, end, text) {
+            // Keyboard users move through the picker with the arrow keys,
+            // which fires change per option; yanking focus into the editor
+            // would strand them.
+            const restore = document.activeElement === examplesSelect ? examplesSelect : null;
+
+            editor.focus();
+            editor.setSelectionRange(start, end);
+
+            let done = false;
+            try {
+                done = text === ''
+                    ? document.execCommand('delete')
+                    : document.execCommand('insertText', false, text);
+            } catch (_) {
+                done = false;
+            }
+            if (!done) {
+                // Browsers that refuse execCommand still get a correct
+                // buffer and caret, just no undo history
+                editor.setRangeText(text, start, end, 'end');
+            }
+
+            // execCommand raises input (so the listener already repainted);
+            // setRangeText does not, hence the explicit call
+            updateHighlighting();
+            if (restore) restore.focus();
+        }
+
+        function setBuffer(text) {
+            editRange(0, editor.value.length, text);
+        }
+
+        // ---------- Bracket matching ----------
+
+        const OPENERS = '([{';
+        const CLOSERS = ')]}';
+
+        // Blank out comments and strings so a paren in prose or in an ASCII
+        // diagram (examples/circuits.sg is full of them) is never taken for
+        // code. Offsets are preserved, so the result indexes like the
+        // original.
+        function maskLiterals(code) {
+            const out = code.split('');
+            let i = 0;
+            while (i < code.length) {
+                if (code[i] === ';') {
+                    while (i < code.length && code[i] !== '\n') out[i++] = ' ';
+                } else if (code[i] === '"') {
+                    const end = code.indexOf('"', i + 1);
+                    const stop = end === -1 ? code.length : end + 1;
+                    while (i < stop) out[i++] = ' ';
+                } else {
+                    i++;
+                }
+            }
+            return out.join('');
+        }
+
+        // Offset -> css class for the delimiter pair around the caret
+        function bracketMarks(code, caret) {
+            const marks = new Map();
+            const masked = maskLiterals(code);
+
+            // The delimiter just before the caret is the one you just
+            // typed, so it wins; the one under the caret is the fallback.
+            for (const i of [caret - 1, caret]) {
+                if (i < 0 || i >= masked.length) continue;
+                const c = masked[i];
+                const oi = OPENERS.indexOf(c);
+                const ci = CLOSERS.indexOf(c);
+                if (oi === -1 && ci === -1) continue;
+
+                const forward = oi !== -1;
+                const open = forward ? c : OPENERS[ci];
+                const close = forward ? CLOSERS[oi] : c;
+                const step = forward ? 1 : -1;
+
+                let depth = 0;
+                for (let j = i; j >= 0 && j < masked.length; j += step) {
+                    if (masked[j] === open) depth += forward ? 1 : -1;
+                    else if (masked[j] === close) depth += forward ? -1 : 1;
+                    if (depth === 0) {
+                        marks.set(i, 'sg-match');
+                        marks.set(j, 'sg-match');
+                        return marks;
+                    }
+                }
+
+                // A closer with nothing to close is a real mistake worth
+                // flagging. An opener without its partner usually just
+                // means the star is still being typed, so stay quiet.
+                if (!forward) marks.set(i, 'sg-unmatched');
+                return marks;
+            }
+            return marks;
+        }
+
+        function currentMarks() {
+            // No caret in the editor means no delimiter to point at
+            if (document.activeElement !== editor) return new Map();
+            return bracketMarks(editor.value, editor.selectionStart);
+        }
+
+        function marksKey(marks) {
+            return Array.from(marks).map(([at, cls]) => at + cls).join(',');
+        }
+
         // ---------- Syntax highlighting ----------
 
-        function highlightSyntax(code) {
+        function highlightSyntax(code, marks) {
             // Escape HTML
             const escapeHtml = (text) => {
                 const div = document.createElement('div');
@@ -695,7 +847,7 @@
                 if (!matched && code[pos] === ";") {
                     const end = code.indexOf('\n', pos);
                     const commentEnd = end === -1 ? code.length : end;
-                    tokens.push({ type: 'comment', text: code.substring(pos, commentEnd) });
+                    tokens.push({ type: 'comment', at: pos, text: code.substring(pos, commentEnd) });
                     pos = commentEnd;
                     matched = true;
                 }
@@ -704,7 +856,7 @@
                 if (!matched && code[pos] === '"') {
                     const end = code.indexOf('"', pos + 1);
                     if (end !== -1) {
-                        tokens.push({ type: 'string', text: code.substring(pos, end + 1) });
+                        tokens.push({ type: 'string', at: pos, text: code.substring(pos, end + 1) });
                         pos = end + 1;
                         matched = true;
                     }
@@ -715,8 +867,8 @@
                 if (!matched && (code[pos] === '+' || code[pos] === '-')) {
                     const match = code.substring(pos).match(/^([+-])([a-z_][a-zA-Z0-9_]*)/);
                     if (match) {
-                        tokens.push({ type: match[1] === '+' ? 'pos' : 'neg', text: match[1] });
-                        tokens.push({ type: 'function', text: match[2] });
+                        tokens.push({ type: match[1] === '+' ? 'pos' : 'neg', at: pos, text: match[1] });
+                        tokens.push({ type: 'function', at: pos + 1, text: match[2] });
                         pos += match[0].length;
                         matched = true;
                     }
@@ -726,7 +878,7 @@
                 const ops = ['==', '~=', '||', '*', '!', '#', '§'];
                 for (const op of ops) {
                     if (!matched && code.substr(pos, op.length) === op) {
-                        tokens.push({ type: 'operator', text: op });
+                        tokens.push({ type: 'operator', at: pos, text: op });
                         pos += op.length;
                         matched = true;
                         break;
@@ -746,15 +898,16 @@
                         } else if (/^\d+$/.test(word)) {
                             type = 'number';
                         }
-                        tokens.push({ type, text: word });
+                        tokens.push({ type, at: pos, text: word });
                         pos += word.length;
                         matched = true;
                     }
                 }
 
-                // Default: plain text
+                // Default: plain text. Delimiters land here, which is what
+                // makes them addressable by the bracket-matching marks.
                 if (!matched) {
-                    tokens.push({ type: 'text', text: code[pos] });
+                    tokens.push({ type: 'text', at: pos, text: code[pos] });
                     pos++;
                 }
             }
@@ -773,7 +926,11 @@
                     case 'operator': html += `<span class="sg-operator">${escaped}</span>`; break;
                     case 'variable': html += `<span class="sg-variable">${escaped}</span>`; break;
                     case 'function': html += `<span class="sg-function">${escaped}</span>`; break;
-                    default: html += escaped;
+                    default: {
+                        const cls = marks && marks.get(token.at);
+                        html += cls ? `<span class="${cls}">${escaped}</span>` : escaped;
+                        break;
+                    }
                 }
             }
 
@@ -792,13 +949,27 @@
         }
 
         // Update highlighting layer (no cursor manipulation needed!)
+        let paintedMarks = '';
+
         function updateHighlighting() {
-            const text = editor.value;
-            highlightLayer.innerHTML = highlightSyntax(text);
+            const marks = currentMarks();
+            paintedMarks = marksKey(marks);
+            highlightLayer.innerHTML = highlightSyntax(editor.value, marks);
             updateLineNumbers();
             // editing can move the textarea's scroll position without a
             // scroll event (e.g. deleting lines at the bottom clamps it)
             syncScroll();
+        }
+
+        // Moving the caret changes only which delimiters are boxed, and the
+        // caret moves far more often than the text does. Repaint solely
+        // when the pair actually differs from what is on screen.
+        function refreshBrackets() {
+            const marks = currentMarks();
+            const key = marksKey(marks);
+            if (key === paintedMarks) return;
+            paintedMarks = key;
+            highlightLayer.innerHTML = highlightSyntax(editor.value, marks);
         }
 
         // The overlay and the gutter follow the textarea's scroll by being
@@ -828,6 +999,12 @@
             if (examplesSelect.value === 'blank') saveDraft(editor.value);
         });
         editor.addEventListener('scroll', syncScroll);
+
+        // selectionchange covers caret moves the other events miss (drag
+        // selection, Home/End, undo); blur clears the pair.
+        ['keyup', 'click', 'focus', 'blur'].forEach((ev) =>
+            editor.addEventListener(ev, refreshBrackets));
+        document.addEventListener('selectionchange', refreshBrackets);
 
         // Land on the saved draft if there is one, otherwise on hello.
         // The default content stays in sync with examples.js, so it
@@ -918,6 +1095,7 @@
             worker.onerror = (e) => {
                 if (pending) clearTimeout(pending.timer);
                 pending = null;
+                setBusy(false);
                 output.textContent = 'Worker error: ' + e.message;
                 output.className = 'error';
                 status.textContent = 'Error';
@@ -925,9 +1103,33 @@
         }
         startWorker();
 
+        // A run used to swallow further clicks in silence (`if (pending)
+        // return`), which read as a dead button. Say so instead, and offer
+        // the way out: terminating the worker is already how the timeout
+        // works, so cancelling on demand costs nothing.
+        function setBusy(busy) {
+            evalBtn.disabled = busy;
+            runBtn.disabled = busy;
+            checkBtn.disabled = busy;
+            stopBtn.hidden = !busy;
+        }
+
+        function stopExecution() {
+            if (!pending) return;
+            clearTimeout(pending.timer);
+            pending = null;
+            worker.terminate();
+            startWorker();
+            setBusy(false);
+            output.textContent = 'Stopped before it finished.';
+            output.className = 'muted';
+            status.textContent = 'Stopped';
+        }
+
         function showResult(result) {
             // "ERROR: " prefix is set by playground.ml on failures
             const failed = result.startsWith('ERROR: ');
+            setBusy(false);
             output.textContent = (failed ? result.slice(7) : result) || '(no output)';
             output.className = failed ? 'error' : 'success';
             status.textContent = failed ? 'Error' : 'Done';
@@ -939,6 +1141,7 @@
         function execute(mode) {
             if (pending) return; // one execution at a time
             const id = ++nextId;
+            setBusy(true);
             status.textContent = STATUS_LABELS[mode];
             output.textContent = 'Executing...';
             output.className = 'muted';
@@ -946,6 +1149,7 @@
                 pending = null;
                 worker.terminate();
                 startWorker();
+                setBusy(false);
                 output.textContent = 'Execution timed out after ' + (TIMEOUT_MS / 1000) + 's (possible infinite loop).';
                 output.className = 'error';
                 status.textContent = 'Timeout';
@@ -968,11 +1172,10 @@
 
         function clear() {
             examplesSelect.value = 'blank';
-            editor.value = '';
+            setBuffer('');
             saveDraft('');
             output.textContent = EMPTY_OUTPUT;
             output.className = 'muted';
-            updateHighlighting();
         }
 
         // Export function - download current code as .sg file
@@ -1010,9 +1213,8 @@
             const reader = new FileReader();
             reader.onload = (event) => {
                 examplesSelect.value = 'blank';
-                editor.value = event.target.result;
+                setBuffer(event.target.result);
                 saveDraft(editor.value);
-                updateHighlighting();
                 status.textContent = `Opened ${file.name}`;
                 setTimeout(() => status.textContent = '', 2000);
             };
@@ -1029,21 +1231,18 @@
         evalBtn.addEventListener('click', evalCode);
         runBtn.addEventListener('click', runCode);
         checkBtn.addEventListener('click', checkCode);
+        stopBtn.addEventListener('click', stopExecution);
         clearBtn.addEventListener('click', clear);
         importBtn.addEventListener('click', importCode);
         exportBtn.addEventListener('click', exportCode);
 
         examplesSelect.addEventListener('change', (e) => {
             if (e.target.value === 'blank') {
-                editor.value = loadDraft() || '';
-                updateHighlighting();
+                setBuffer(loadDraft() || '');
                 return;
             }
             const example = examples[e.target.value];
-            if (example) {
-                editor.value = example;
-                updateHighlighting();
-            }
+            if (example) setBuffer(example);
         });
 
         // Keyboard shortcuts
@@ -1059,11 +1258,7 @@
             // Tab key inserts spaces instead of changing focus
             if (e.key === 'Tab') {
                 e.preventDefault();
-                const start = editor.selectionStart;
-                const end = editor.selectionEnd;
-                editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-                editor.selectionStart = editor.selectionEnd = start + 2;
-                updateHighlighting();
+                editRange(editor.selectionStart, editor.selectionEnd, '  ');
             }
         });
     </script>
