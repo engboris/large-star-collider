@@ -29,6 +29,12 @@ Variable identity is the (name, index) pair, not its printed form:
   $ sgen run syntax/var_index_collision.sg
   [(out a) (h V1) (h V2) (h V3) (h V4) (h V5) (h V6) (h V7) (h V8) (h V9) (h X)]
 
+The empty list prints as [], not as its internal encoding:
+  $ sgen run syntax/lists.sg
+  (c [x b] [] [a])
+  [ok (out [])]
+  (c [a b c] [a|X])
+
 String literals print quoted, and escape sequences work:
   $ sgen run syntax/strings.sg
   "hello"

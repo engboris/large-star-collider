@@ -70,10 +70,15 @@ and read lexbuf =
     | '!', ('A' .. 'Z' | '_'), Star (Compl (Chars "; \t\n\r()[]{}|")) ->
       let lexeme = Utf8.lexeme lexbuf in
       GVAR (String.sub lexeme 1 (String.length lexeme - 1))
-    | ( Compl (Chars "';\" \t\n\r()[]{}|@#*" | 0xA7)
+    | ( Compl (Chars "';\" \t\n\r()[]{}|@#*%" | 0xA7)
       , Star (Compl (Chars "; \t\n\r()[]{}|")) ) -> (
       let lexeme = Utf8.lexeme lexbuf in
       match lexeme.[0] with '_' | 'A' .. 'Z' -> VAR lexeme | _ -> SYM lexeme )
+    (* A leading % is excluded from the rule above so that the names the
+       compiler generates cannot be written by hand. *)
+    | '%' ->
+      let msg = "'%' starts an internal name and is reserved" in
+      raise (LexerError (msg, get_pos ()))
     | '(' ->
       push_delimiter '(' (get_pos ());
       LPAR

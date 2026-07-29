@@ -19,6 +19,18 @@ Test unterminated string literal:
   found 1 error(s)
   [1]
 
+Test that internal %-names cannot be forged:
+  $ sgen run errors/reserved_percent.sg
+  error: '%' starts an internal name and is reserved
+    --> errors/reserved_percent.sg:2:19
+  
+      2 | (show (exec [(-f (%! X)) (out X)] [(+f a)]))
+        |                   ^
+  
+  
+  found 1 error(s)
+  [1]
+
 Test unknown escape sequence:
   $ sgen run errors/unknown_escape.sg
   error: Unknown escape sequence '\x'

@@ -1,0 +1,2 @@
+; Test that internal %-names cannot be forged
+(show (exec [(-f (%! X)) (out X)] [(+f a)]))

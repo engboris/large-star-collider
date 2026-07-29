@@ -1,0 +1,7 @@
+; The empty list prints as [], not as its %nil encoding, so a result can
+; be read back as input.
+(show (c [x b] [] [a]))
+(show (exec [(+f []) ok] [(-f X) (out X)]))
+
+; Non-empty and improper lists
+(show (c [a b c] [a|X]))

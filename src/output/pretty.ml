@@ -21,6 +21,7 @@ let escape_string_contents =
 
 let rec string_of_ray = function
   | Var var -> string_of_var var
+  | Func ((Null, "%nil"), []) -> "[]"
   | Func (pf, []) -> string_of_polsym pf
   | Func ((Null, "%group"), terms) ->
     (* Pretty-print constellation groups as {...} *)
@@ -30,19 +31,20 @@ let rec string_of_ray = function
         List.map terms ~f:string_of_ray |> String.concat ~sep:" "
       in
       Printf.sprintf "{ %s }" stars_str
-  | Func ((Null, "%cons"), [ head; tail ]) ->
-    (* Pretty-print cons lists as [a b c] *)
+  | Func ((Null, "%cons"), [ head; tail ]) -> (
+    (* Cons lists as [a b c], and a non-nil tail as [a b|tail] *)
     let rec collect_list acc = function
       | Func ((Null, "%cons"), [ h; t ]) -> collect_list (h :: acc) t
-      | Func ((Null, "%nil"), []) -> List.rev acc
-      | other -> List.rev (other :: acc)
-      (* Improper list [a b|tail] *)
+      | Func ((Null, "%nil"), []) -> (List.rev acc, None)
+      | other -> (List.rev acc, Some other)
     in
-    let elements = collect_list [ head ] tail in
+    let elements, rest = collect_list [ head ] tail in
     let elems_str =
       List.map elements ~f:string_of_ray |> String.concat ~sep:" "
     in
-    Printf.sprintf "[%s]" elems_str
+    match rest with
+    | None -> Printf.sprintf "[%s]" elems_str
+    | Some t -> Printf.sprintf "[%s|%s]" elems_str (string_of_ray t) )
   | Func ((Null, "*"), [ inner ]) ->
     (* Catalyst marker *)
     Printf.sprintf "*%s" (string_of_ray inner)
