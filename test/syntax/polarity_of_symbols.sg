@@ -1,0 +1,19 @@
+; Regression tests for polarity read off the first character.
+
+; String contents are text, not a ray head: "+a" and "-a" are two
+; unrelated symbols and must not cancel each other.
+(show (exec ["+a" ok] ["-a" no]))
+
+; An empty string used to reach String.get on an empty symbol.
+(show "")
+
+; A bare + or - inside a term is neutral, so rays that look entirely
+; neutral do not interact.
+(show (exec [(result X + Y = R) one] [(result a - b = c) two]))
+
+; The same neutral symbol still unifies, which is what infix notation
+; like (result X + Y = R) relies on.
+(show (exec [(+f a) (result X + Y = R)] [(-f a) (result 1 + 2 = 3)]))
+
+; Heading a list, + and - remain the anonymous dual ray.
+(show (exec [(+ (var a)) one] [(- (var a)) two]))
