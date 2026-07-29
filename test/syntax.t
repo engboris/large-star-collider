@@ -24,3 +24,7 @@ Match (~=) is polarity-blind structural unifiability:
 Variable renaming (same-named locals in fused stars stay distinct):
   $ sgen run syntax/var_renaming.sg
   [(o2 7) (o1 5)]
+
+Variable identity is the (name, index) pair, not its printed form:
+  $ sgen run syntax/var_index_collision.sg
+  [(out a) (h V1) (h V2) (h V3) (h V4) (h V5) (h V6) (h V7) (h V8) (h V9) (h X)]

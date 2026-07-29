@@ -14,7 +14,10 @@ module StellarSig = struct
   let string_of_idvar (s, index_opt) =
     match index_opt with None -> s | Some j -> s ^ Int.to_string j
 
-  let equal_idvar x y = String.equal (string_of_idvar x) (string_of_idvar y)
+  (* Compare the pair, not its printed form: name ^ index would make
+     ("X1", Some 0) and ("X", Some 10) the same variable. *)
+  let equal_idvar (s1, i1) (s2, i2) =
+    String.equal s1 s2 && Option.equal Int.equal i1 i2
 
   let equal_idfunc (p1, f1) (p2, f2) =
     equal_polarity p1 p2 && String.equal f1 f2

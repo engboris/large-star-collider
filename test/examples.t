@@ -17,16 +17,16 @@ Hello world example:
 
 Lambda calculus example:
   $ sgen run ../examples/lambda/lambda.sg
-  [(out [r X3]) (lproj (exp [r l X3] d))]
+  [(out [r X]) (lproj (exp [r l X] d))]
 
 Linear lambda example:
   $ sgen run ../examples/lambda/linear_lambda.sg
-  [(out [X7]) (x X7)]
-  [(out [r X7]) (ida [l X7])]
+  [(out [X]) (x X)]
+  [(out [r X]) (ida [l X])]
 
 MALL (multiplicative-additive linear logic) example:
   $ sgen run ../examples/proofnets/mall.sg
-  { [(+3 [l r X]) (d X)] [(+5 [r l X]) (+5 [r r X]) || (slice c b)] [(+5 [l r X3]) (c X3) || (slice c a)] }
+  { [(+3 [l r X]) (d X)] [(+5 [r l X]) (+5 [r r X]) || (slice c b)] [(+5 [l r X]) (c X) || (slice c a)] }
 
 MLL (multiplicative linear logic) example:
   $ sgen run ../examples/proofnets/mll.sg
