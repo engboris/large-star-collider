@@ -102,6 +102,17 @@ Declaration Errors
 Test that any expression is now valid as a term (unified design):
   $ sgen run errors/invalid_declaration.sg
 
+Test that a call inside a term is rejected:
+  $ sgen run errors/call_in_term.sg
+  error: misplaced call '#k'
+    --> errors/call_in_term.sg:3:7
+  
+      3 | (show [(-run #k idle T)])
+        |       ^
+    hint: A call is resolved when the program runs, so it cannot be part of a term.
+  
+  [1]
+
 
 Fail-Fast on Multiple Errors
 -----------------------------

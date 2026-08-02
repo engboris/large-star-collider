@@ -7,6 +7,7 @@ type expr_err =
   | InvalidMacroArgument of string
   | InvalidBanStructure of string
   | MisplacedStatic of string
+  | MisplacedCall of string
   | StaticOnObject
   | StaticOnMacro
   | CircularImport of string

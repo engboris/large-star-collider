@@ -1,0 +1,3 @@
+; Test a call used inside a term
+(def k idle)
+(show [(-run #k idle T)])

@@ -443,6 +443,15 @@ let rec ray_of_expr : expr -> (ray, expr_err) Result.t = function
     (* Without this case a nested § would be silently absorbed into a
        function term *)
     Error (MisplacedStatic (to_string e))
+  | List ({ content = Symbol h; _ } :: args) as e when String.equal h call_op ->
+    (* A call is resolved at evaluation, so it has no meaning inside a
+       term *)
+    let written =
+      match args with
+      | [ arg ] -> call_op ^ to_string arg.content
+      | _ -> to_string e
+    in
+    Error (MisplacedCall written)
   | List [ { content = Symbol h; _ }; { content = Symbol s; _ } ]
     when String.equal h string_op ->
     (* String contents are text: never polarised, whatever the first
