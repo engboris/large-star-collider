@@ -1,0 +1,10 @@
+; Strings print quoted and escaped, so a result can be read back as
+; input instead of looking like rays.
+(show "hello")
+(show [(f "x") "y"])
+
+; Escape sequences: the lexer used to read the character after the
+; escaped one, which made every escape fail.
+(show "a \"quoted\" one")
+(show "tab:\there")
+(show "backslash:\\")

@@ -24,3 +24,29 @@ Match (~=) is polarity-blind structural unifiability:
 Variable renaming (same-named locals in fused stars stay distinct):
   $ sgen run syntax/var_renaming.sg
   [(o2 7) (o1 5)]
+
+Variable identity is the (name, index) pair, not its printed form:
+  $ sgen run syntax/var_index_collision.sg
+  [(out a) (h V1) (h V2) (h V3) (h V4) (h V5) (h V6) (h V7) (h V8) (h V9) (h X)]
+
+The empty list prints as [], not as its internal encoding:
+  $ sgen run syntax/lists.sg
+  (c [x b] [] [a])
+  [ok (out [])]
+  (c [a b c] [a|X])
+
+String literals print quoted, and escape sequences work:
+  $ sgen run syntax/strings.sg
+  "hello"
+  [(f "x") "y"]
+  "a \"quoted\" one"
+  "tab:\there"
+  "backslash:\\"
+
+Polarity is read off a symbol, never off string contents or a bare +/-:
+  $ sgen run syntax/polarity_of_symbols.sg
+  { ["+a" ok] ["-a" no] }
+  ""
+  { [(result X + Y = R) one] [(result a - b = c) two] }
+  [(result X + Y = R) (result 1 + 2 = 3)]
+  [one two]

@@ -334,6 +334,10 @@ let pp_err error : (string, err) Result.t =
           ( Printf.sprintf "misplaced '\xc2\xa7' in '%s'" expr
           , "The '\xc2\xa7' marker can only prefix a whole top-level \
              expression." )
+        | MisplacedCall call ->
+          ( Printf.sprintf "misplaced call '%s'" call
+          , "A call is resolved when the program runs, so it cannot be part of \
+             a term." )
         | StaticOnObject ->
           ( "'\xc2\xa7' cannot be applied to an object definition"
           , "Objects are shared between both phases; remove the marker." )

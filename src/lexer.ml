@@ -70,10 +70,15 @@ and read lexbuf =
     | '!', ('A' .. 'Z' | '_'), Star (Compl (Chars "; \t\n\r()[]{}|")) ->
       let lexeme = Utf8.lexeme lexbuf in
       GVAR (String.sub lexeme 1 (String.length lexeme - 1))
-    | ( Compl (Chars "';\" \t\n\r()[]{}|@#*" | 0xA7)
+    | ( Compl (Chars "';\" \t\n\r()[]{}|@#*%" | 0xA7)
       , Star (Compl (Chars "; \t\n\r()[]{}|")) ) -> (
       let lexeme = Utf8.lexeme lexbuf in
       match lexeme.[0] with '_' | 'A' .. 'Z' -> VAR lexeme | _ -> SYM lexeme )
+    (* A leading % is excluded from the rule above so that the names the
+       compiler generates cannot be written by hand. *)
+    | '%' ->
+      let msg = "'%' starts an internal name and is reserved" in
+      raise (LexerError (msg, get_pos ()))
     | '(' ->
       push_delimiter '(' (get_pos ());
       LPAR
@@ -120,19 +125,23 @@ and string_literal lexbuf =
   let rec loop () =
     match%sedlex lexbuf with
     | '"' -> STRING (Buffer.contents buffer)
-    | '\\', any ->
+    | '\\' ->
+      (* The escaped character is read here: matching it together with
+         the backslash above would leave this match on the character
+         after it. *)
       let escaped =
         match%sedlex lexbuf with
         | 'n' -> '\n'
         | 't' -> '\t'
         | '\\' -> '\\'
         | '"' -> '"'
-        | _ ->
+        | any ->
           let msg =
             Printf.sprintf "Unknown escape sequence '\\%s'"
               (Sedlexing.Utf8.lexeme lexbuf)
           in
           raise (LexerError (msg, get_pos ()))
+        | _ -> raise (LexerError ("Unterminated string literal", get_pos ()))
       in
       Buffer.add_char buffer escaped;
       loop ()

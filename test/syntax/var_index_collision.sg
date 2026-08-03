@@ -1,0 +1,9 @@
+; Regression test for variable identity during fusion renaming.
+; Variables are (name, index) pairs. Comparing them by name ^ index made
+; ("X1", 0) and ("X", 10) the same variable, so unifying the renamed X1
+; of the first star also bound the untouched X of the second one.
+; The second star needs ten variables before X so that X gets index 10.
+(show (exec
+  [(+f X1) (out X1)]
+  [(-f a) (h V1) (h V2) (h V3) (h V4) (h V5)
+          (h V6) (h V7) (h V8) (h V9) (h X)]))

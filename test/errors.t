@@ -19,13 +19,25 @@ Test unterminated string literal:
   found 1 error(s)
   [1]
 
+Test that internal %-names cannot be forged:
+  $ sgen run errors/reserved_percent.sg
+  error: '%' starts an internal name and is reserved
+    --> errors/reserved_percent.sg:2:19
+  
+      2 | (show (exec [(-f (%! X)) (out X)] [(+f a)]))
+        |                   ^
+  
+  
+  found 1 error(s)
+  [1]
+
 Test unknown escape sequence:
   $ sgen run errors/unknown_escape.sg
-  error: Unknown escape sequence '\'
-    --> errors/unknown_escape.sg:2:19
+  error: Unknown escape sequence '\x'
+    --> errors/unknown_escape.sg:2:18
   
       2 | (def test "hello\xworld")
-        |                   ^
+        |                  ^
   
   
   found 1 error(s)
@@ -33,11 +45,11 @@ Test unknown escape sequence:
 
 Test invalid escape sequence:
   $ sgen run errors/invalid_string_char.sg
-  error: Unknown escape sequence '\'
-    --> errors/invalid_string_char.sg:2:19
+  error: Unknown escape sequence '\q'
+    --> errors/invalid_string_char.sg:2:18
   
       2 | (def test "valid\qinvalid")
-        |                   ^
+        |                  ^
   
   
   found 1 error(s)
@@ -89,6 +101,17 @@ Declaration Errors
 
 Test that any expression is now valid as a term (unified design):
   $ sgen run errors/invalid_declaration.sg
+
+Test that a call inside a term is rejected:
+  $ sgen run errors/call_in_term.sg
+  error: misplaced call '#k'
+    --> errors/call_in_term.sg:3:7
+  
+      3 | (show [(-run #k idle T)])
+        |       ^
+    hint: A call is resolved when the program runs, so it cannot be part of a term.
+  
+  [1]
 
 
 Fail-Fast on Multiple Errors

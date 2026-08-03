@@ -417,11 +417,22 @@ let preprocess_with_macro_env (macro_env : macro_env) (raw_exprs : Raw.t list) :
    Constellation of Expr
    --------------------------------------- *)
 
+(* A leading + or - is a polarity only when a name follows it: a lone
+   + or - is an ordinary neutral symbol. *)
 let symbol_of_str (symbol : string) : idfunc =
-  match String.get symbol 0 with
-  | '+' -> (Pos, String.subo symbol ~pos:1)
-  | '-' -> (Neg, String.subo symbol ~pos:1)
-  | _ -> (Null, symbol)
+  if String.length symbol <= 1 then (Null, symbol)
+  else
+    match String.get symbol 0 with
+    | '+' -> (Pos, String.subo symbol ~pos:1)
+    | '-' -> (Neg, String.subo symbol ~pos:1)
+    | _ -> (Null, symbol)
+
+(* Heading a list, a lone + or - is the anonymous dual ray. *)
+let head_symbol_of_str (symbol : string) : idfunc =
+  match symbol with
+  | "+" -> (Pos, "")
+  | "-" -> (Neg, "")
+  | _ -> symbol_of_str symbol
 
 let rec ray_of_expr : expr -> (ray, expr_err) Result.t = function
   | Symbol s -> to_func (symbol_of_str s, []) |> Result.return
@@ -432,9 +443,23 @@ let rec ray_of_expr : expr -> (ray, expr_err) Result.t = function
     (* Without this case a nested § would be silently absorbed into a
        function term *)
     Error (MisplacedStatic (to_string e))
+  | List ({ content = Symbol h; _ } :: args) as e when String.equal h call_op ->
+    (* A call is resolved at evaluation, so it has no meaning inside a
+       term *)
+    let written =
+      match args with
+      | [ arg ] -> call_op ^ to_string arg.content
+      | _ -> to_string e
+    in
+    Error (MisplacedCall written)
+  | List [ { content = Symbol h; _ }; { content = Symbol s; _ } ]
+    when String.equal h string_op ->
+    (* String contents are text: never polarised, whatever the first
+       character is. *)
+    to_func ((Null, string_op), [ to_func ((Null, s), []) ]) |> Result.return
   | List ({ content = Symbol h; _ } :: t) ->
     let* args = List.map ~f:(fun e -> ray_of_expr e.content) t |> Result.all in
-    to_func (symbol_of_str h, args) |> Result.return
+    to_func (head_symbol_of_str h, args) |> Result.return
   | List (_ :: _) as e -> Error (NonConstantRayHeader (to_string e))
 
 let bans_of_expr ban_exprs : (ban list, expr_err) Result.t =
