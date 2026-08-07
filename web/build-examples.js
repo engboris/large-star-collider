@@ -9,10 +9,14 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration: map example keys to their source files
-// Order: hello, macros, relational examples, states examples, proofnets examples
+// Order: hello, macros, circuits, lambda, relational examples,
+// states examples, proofnets examples
 const EXAMPLE_MAPPING = {
   hello: 'hello.sg',
   macros: 'macros.sg',
+  circuits: 'circuits.sg',
+  // Lambda examples
+  'lambda-linear': 'lambda/linear_lambda.sg',
   // Relational examples
   'relational-arithmetic': 'relational/arithmetic.sg',
   'relational-joins': 'relational/joins.sg',
@@ -21,9 +25,7 @@ const EXAMPLE_MAPPING = {
   'states-npda': 'states/npda.sg',
   'states-turing': 'states/turing.sg',
   // Proofnets examples
-  'proofnets-mall': 'proofnets/mall.sg',
-  'proofnets-mll': 'proofnets/mll.sg',
-  'proofnets-fomll': 'proofnets/fomll.sg'
+  'proofnets-mll': 'proofnets/mll.sg'
 };
 
 // Path configuration
